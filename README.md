@@ -27,7 +27,7 @@ Save and organize your favorite sites with a built-in bookmark manager designed 
 
 ## 📱 Quick Start
 
-**Ready to drive?** Download the latest APK from our [GitHub Releases](https://github.com/kododake/AABrowser/releases) page.
+**Ready to drive?** If you agree to the license, download the latest APK from the [GitHub Releases](https://github.com/kododake/AABrowser/releases) page.
 
 ---
 
