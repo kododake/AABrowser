@@ -7,6 +7,8 @@ Transform your driving experience with a sleek, modern browser designed specific
 Privacy First: There are no trackers in this app.  
 Since I don't collect any usage data or crash logs, I rely on your reports. If you find a bug, please let me know in the Issues or Discussions tab!  
 
+<img width="549" height="320" alt="screenshot" src="https://github.com/user-attachments/assets/37ff359a-ff8b-4288-9b5e-60f74c373ffe" />
+<img width="550" height="320" alt="screenshot" src="https://github.com/user-attachments/assets/5ff90084-d957-4312-aff3-8925e7d2f168" />
 ---
 
 ## ✨ What Makes It Special
