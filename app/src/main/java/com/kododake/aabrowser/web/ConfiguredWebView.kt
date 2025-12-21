@@ -112,32 +112,6 @@ fun configureWebView(
                 return handleUri(view, uri)
             }
 
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                val uri = Uri.parse(url)
-                val scheme = uri.scheme?.lowercase()
-                if (scheme == "http") {
-                    val host = uri.host?.lowercase()
-                    if (!com.kododake.aabrowser.data.BrowserPreferences.isHostAllowedCleartext(view.context, host)) {
-                        val allowOnce = {
-                            view.post { view.loadUrl(uri.toString()) }
-                            kotlin.Unit
-                        }
-                        val allowHost = {
-                            view.context?.let { ctx ->
-                                val hostToStore = uri.host?.lowercase()
-                                if (hostToStore != null) com.kododake.aabrowser.data.BrowserPreferences.addAllowedCleartextHost(ctx, hostToStore)
-                            }
-                            view.post { view.loadUrl(uri.toString()) }
-                            kotlin.Unit
-                        }
-                        val cancel = { kotlin.Unit }
-                        callbacks.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
-                        return true
-                    }
-                }
-                return handleUri(view, uri)
-            }
-
             private fun handleUri(view: WebView, uri: Uri?): Boolean {
                 uri ?: return false
                 val scheme = uri.scheme?.lowercase()
