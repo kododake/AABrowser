@@ -2,4 +2,14 @@
 <resources>
 
     <style name="Theme.AABrowser" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar" />
+
+    <!-- Bottom Sheet Shape -->
+    <style name="ShapeAppearanceOverlay.App.Card.BottomSheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
 </resources>

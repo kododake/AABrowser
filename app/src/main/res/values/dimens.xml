@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Menu Layout Dimensions -->
+    <dimen name="menu_card_corner_radius">28dp</dimen>
+    <dimen name="menu_card_elevation">8dp</dimen>
+    <dimen name="menu_padding_horizontal">20dp</dimen>
+    <dimen name="menu_padding_vertical">24dp</dimen>
+    <dimen name="menu_max_height">600dp</dimen>
+
+    <!-- Content Spacing -->
+    <dimen name="menu_section_spacing">20dp</dimen>
+    <dimen name="menu_item_spacing">16dp</dimen>
+    <dimen name="menu_small_spacing">8dp</dimen>
+
+    <!-- UI Elements -->
+    <dimen name="button_corner_radius">16dp</dimen>
+    <dimen name="card_corner_radius">16dp</dimen>
+    <dimen name="drag_handle_width">40dp</dimen>
+    <dimen name="drag_handle_height">4dp</dimen>
+
+    <!-- Button Sizes -->
+    <dimen name="icon_button_size">48dp</dimen>
+    <dimen name="icon_size_small">20dp</dimen>
+    <dimen name="icon_size_medium">24dp</dimen>
+</resources>
+
+
+

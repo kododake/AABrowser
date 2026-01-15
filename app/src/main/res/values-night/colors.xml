@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Opaque dark background for address bar in dark mode -->
+    <color name="address_bar_background">#FF1C1C1C</color>
+</resources>
+

@@ -5,15 +5,14 @@
     android:layout_height="match_parent"
     android:fitsSystemWindows="true">
 
-        
-
     <com.google.android.material.progressindicator.LinearProgressIndicator
         android:id="@+id/progressIndicator"
         android:layout_width="match_parent"
-        android:layout_height="4dp"
+        android:layout_height="3dp"
         android:layout_gravity="top"
         android:visibility="gone"
-        app:trackThickness="4dp" />
+        app:trackThickness="3dp"
+        app:indicatorColor="?attr/colorPrimary" />
 
     <FrameLayout
         android:id="@+id/contentRoot"
@@ -44,18 +43,19 @@
             android:id="@+id/menuOverlayScrim"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#80000000" />
+            android:background="#80000000"
+            android:alpha="0" />
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/menuCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:layout_marginStart="16dp"
-            android:layout_marginTop="24dp"
-            android:layout_marginEnd="16dp"
-            app:cardCornerRadius="20dp"
-            app:cardElevation="6dp"
+            android:layout_gravity="bottom"
+            android:layout_marginStart="0dp"
+            android:layout_marginEnd="0dp"
+            android:layout_marginBottom="0dp"
+            app:cardElevation="@dimen/menu_card_elevation"
+            app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Card.BottomSheet"
             android:clickable="true"
             android:focusable="true">
 
@@ -67,8 +67,8 @@
                     android:id="@+id/menuScroll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:fillViewport="true"
-                    android:padding="16dp"
+                    android:maxHeight="@dimen/menu_max_height"
+                    android:fillViewport="false"
                     android:clipToPadding="false"
                     android:overScrollMode="ifContentScrolls">
 
@@ -76,7 +76,312 @@
                         android:id="@+id/menuContentRoot"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/menu_padding_horizontal"
+                        android:paddingEnd="@dimen/menu_padding_horizontal"
+                        android:paddingTop="@dimen/menu_small_spacing"
+                        android:paddingBottom="@dimen/menu_padding_vertical">
+
+                        <!-- Drag Handle - Swipe down to close -->
+                        <FrameLayout
+                            android:id="@+id/dragHandleArea"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="16dp">
+
+                            <View
+                                android:id="@+id/dragHandle"
+                                android:layout_width="48dp"
+                                android:layout_height="5dp"
+                                android:layout_gravity="center_horizontal"
+                                android:background="@drawable/drag_handle_background" />
+                        </FrameLayout>
+
+                        <!-- Header Section -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="?attr/colorPrimaryContainer">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="16dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:baselineAligned="false">
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginEnd="12dp">
+
+                                        <TextView
+                                            android:id="@+id/menuTitle"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/menu_title"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                                            android:textStyle="bold"
+                                            android:textColor="?attr/colorOnPrimaryContainer" />
+
+                                        <TextView
+                                            android:id="@+id/pageTitle"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:ellipsize="end"
+                                            android:maxLines="1"
+                                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                            android:textColor="?attr/colorOnPrimaryContainer"
+                                            android:alpha="0.8" />
+                                    </LinearLayout>
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonClose"
+                                        style="@style/Widget.Material3.Button.OutlinedButton"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/menu_close"
+                                        android:textColor="?attr/colorOnPrimaryContainer"
+                                        app:strokeColor="?attr/colorOnPrimaryContainer"
+                                        app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                                        app:iconTint="?attr/colorOnPrimaryContainer"
+                                        app:iconGravity="start" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Address Bar -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_item_spacing"
+                            app:cardCornerRadius="28dp"
+                            app:cardElevation="0dp"
+                            app:strokeWidth="1dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:cardBackgroundColor="@color/address_bar_background">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingStart="16dp"
+                                android:paddingEnd="4dp"
+                                android:paddingTop="4dp"
+                                android:paddingBottom="4dp"
+                                android:minHeight="56dp">
+
+                                <ImageView
+                                    android:id="@+id/addressSecureIcon"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:src="@android:drawable/ic_secure"
+                                    app:tint="?attr/colorOnSurfaceVariant"
+                                    android:contentDescription="@string/secure_connection" />
+
+                                <com.google.android.material.textfield.TextInputEditText
+                                    android:id="@+id/addressEdit"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="12dp"
+                                    android:layout_marginEnd="8dp"
+                                    android:background="@android:color/transparent"
+                                    android:hint="@string/menu_address_label"
+                                    android:imeOptions="actionGo"
+                                    android:inputType="textUri"
+                                    android:singleLine="true"
+                                    android:textSize="15sp"
+                                    android:textColor="?attr/colorOnSurface"
+                                    android:textColorHint="?attr/colorOnSurfaceVariant" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonClearAddress"
+                                    style="@style/Widget.Material3.Button.IconButton"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
+                                    android:contentDescription="@string/menu_clear_address"
+                                    android:visibility="gone"
+                                    app:icon="@android:drawable/ic_menu_close_clear_cancel"
+                                    app:iconSize="20dp"
+                                    app:iconTint="?attr/colorOnSurfaceVariant" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonGo"
+                                    style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                                    android:layout_width="48dp"
+                                    android:layout_height="48dp"
+                                    android:contentDescription="@string/menu_go"
+                                    app:icon="@android:drawable/ic_menu_search"
+                                    app:iconSize="20dp" />
+
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Navigation Actions Grid -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_section_spacing"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:strokeWidth="1dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+                            <GridLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:columnCount="3"
+                                android:rowCount="2"
+                                android:padding="12dp"
+                                android:alignmentMode="alignBounds"
+                                android:columnOrderPreserved="false">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonBack"
+                                    style="@style/Widget.Material3.Button.TonalButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_columnWeight="1"
+                                    android:layout_row="0"
+                                    android:layout_column="0"
+                                    android:layout_margin="4dp"
+                                    android:text="@string/menu_back"
+                                    android:textSize="13sp"
+                                    app:icon="@android:drawable/ic_menu_revert"
+                                    app:iconGravity="top"
+                                    app:iconSize="@dimen/icon_size_small"
+                                    app:iconPadding="4dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonReload"
+                                    style="@style/Widget.Material3.Button.TonalButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_columnWeight="1"
+                                    android:layout_row="0"
+                                    android:layout_column="1"
+                                    android:layout_margin="4dp"
+                                    android:text="@string/menu_reload"
+                                    android:textSize="13sp"
+                                    app:icon="@android:drawable/ic_popup_sync"
+                                    app:iconGravity="top"
+                                    app:iconSize="@dimen/icon_size_small"
+                                    app:iconPadding="4dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonForward"
+                                    style="@style/Widget.Material3.Button.TonalButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_columnWeight="1"
+                                    android:layout_row="0"
+                                    android:layout_column="2"
+                                    android:layout_margin="4dp"
+                                    android:text="@string/menu_forward"
+                                    android:textSize="13sp"
+                                    app:icon="@android:drawable/ic_media_play"
+                                    app:iconGravity="top"
+                                    app:iconSize="@dimen/icon_size_small"
+                                    app:iconPadding="4dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonBookmarks"
+                                    style="@style/Widget.Material3.Button.TonalButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_columnWeight="1"
+                                    android:layout_row="1"
+                                    android:layout_column="0"
+                                    android:layout_margin="4dp"
+                                    android:text="@string/menu_bookmarks"
+                                    android:textSize="13sp"
+                                    app:icon="@android:drawable/star_on"
+                                    app:iconGravity="top"
+                                    app:iconSize="@dimen/icon_size_small"
+                                    app:iconPadding="4dp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/buttonExternal"
+                                    style="@style/Widget.Material3.Button.TonalButton"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_columnWeight="1"
+                                    android:layout_row="1"
+                                    android:layout_column="1"
+                                    android:layout_margin="4dp"
+                                    android:text="External"
+                                    android:textSize="13sp"
+                                    app:icon="@android:drawable/ic_menu_share"
+                                    app:iconGravity="top"
+                                    app:iconSize="@dimen/icon_size_small"
+                                    app:iconPadding="4dp" />
+
+                            </GridLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Desktop Mode Toggle -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_item_spacing"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:strokeWidth="1dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerLow">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:padding="16dp"
+                                android:minHeight="56dp">
+
+                                <ImageView
+                                    android:layout_width="@dimen/icon_size_medium"
+                                    android:layout_height="@dimen/icon_size_medium"
+                                    android:src="@android:drawable/ic_menu_view"
+                                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                                <TextView
+                                    android:id="@+id/desktopSwitchLabel"
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:layout_marginStart="16dp"
+                                    android:text="@string/menu_desktop_mode"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+                                <com.google.android.material.switchmaterial.SwitchMaterial
+                                    android:id="@+id/desktopSwitch"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content" />
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Footer Section -->
+                        <com.google.android.material.divider.MaterialDivider
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_section_spacing"
+                            android:layout_marginBottom="@dimen/menu_item_spacing"
+                            app:dividerColor="?attr/colorOutlineVariant" />
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -91,259 +396,479 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/menuTitle"
+                                    android:id="@+id/githubCredit"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/menu_title"
-                                    android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
+                                    android:text="@string/app_credit"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                                 <TextView
-                                    android:id="@+id/pageTitle"
-                                    android:layout_width="match_parent"
+                                    android:id="@+id/menuVersion"
+                                    android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:ellipsize="end"
-                                    android:maxLines="1"
-                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+                                    android:layout_marginTop="2dp"
+                                    android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:alpha="0.6"
+                                    android:text="unknown" />
                             </LinearLayout>
 
                             <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonClose"
+                                android:id="@+id/buttonCheckLatest"
                                 style="@style/Widget.Material3.Button.TextButton"
                                 android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/menu_close" />
+                                android:layout_height="36dp"
+                                android:text="@string/menu_check_latest"
+                                android:textSize="12sp"
+                                android:minWidth="0dp"
+                                android:paddingStart="12dp"
+                                android:paddingEnd="12dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/buttonExternalGithub"
+                                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                                android:layout_width="36dp"
+                                android:layout_height="36dp"
+                                android:layout_marginStart="4dp"
+                                android:contentDescription="@string/menu_open_github"
+                                app:icon="@drawable/ic_github"
+                                app:iconSize="18dp"
+                                app:iconTint="?attr/colorOnSecondaryContainer" />
                         </LinearLayout>
-
-                        <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/addressInputLayout"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:hint="@string/menu_address_label"
-                            app:endIconMode="custom"
-                            app:endIconDrawable="@drawable/abc_ic_clear_material"
-                            app:endIconTint="?attr/colorOnSurface"
-                            app:endIconContentDescription="@string/clear_text_end_icon_content_description">
-
-                            <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/addressEdit"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:imeOptions="actionGo"
-                                android:inputType="textUri"
-                                android:singleLine="true" />
-                        </com.google.android.material.textfield.TextInputLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingEnd="8dp">
-
-                            <androidx.appcompat.widget.SwitchCompat
-                                android:id="@+id/desktopSwitch"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:showText="false" />
-
-                            <TextView
-                                android:id="@+id/desktopSwitchLabel"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:text="@string/menu_desktop_mode"
-                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
-                            android:orientation="horizontal"
-                            android:weightSum="5"
-                            android:gravity="center">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonBack"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/menu_back" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonReload"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:text="@string/menu_reload" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonForward"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:text="@string/menu_forward" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonGo"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:text="@string/menu_go" />
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonBookmarks"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:text="@string/menu_bookmarks" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
-                            android:gravity="start|center_vertical"
-                            android:orientation="horizontal">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/buttonExternal"
-                                style="@style/Widget.Material3.Button.TextButton"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="@string/menu_open_external" />
-
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="8dp"
-                                android:layout_weight="1"
-                                android:orientation="horizontal"
-                                android:gravity="end|center_vertical">
-
-                                <ImageButton
-                                    android:id="@+id/buttonExternalGithub"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:background="?attr/selectableItemBackgroundBorderless"
-                                    android:contentDescription="@string/menu_open_github"
-                                    android:padding="8dp"
-                                    android:src="@drawable/ic_github"
-                                    app:tint="?attr/colorOnSurface" />
-
-                                <LinearLayout
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:orientation="vertical"
-                                    android:layout_marginStart="8dp"
-                                    android:gravity="end">
-
-                                    <TextView
-                                        android:id="@+id/githubCredit"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="@string/app_credit"
-                                        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-                                        android:textAllCaps="false" />
-                                        
-                                    <TextView
-                                        android:id="@+id/menuVersion"
-                                        android:layout_width="match_parent"
-                                        android:layout_height="wrap_content"
-                                        android:gravity="end"
-                                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                                        android:textAllCaps="false"
-                                        android:textColor="?attr/colorOnSurface"
-                                        android:text="unknown" />
-
-                                    <TextView
-                                        android:id="@+id/githubOpen"
-                                        android:layout_width="wrap_content"
-                                        android:layout_height="wrap_content"
-                                        android:text="@string/menu_open_github"
-                                        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                                        android:textAllCaps="false"
-                                        android:clickable="true"
-                                        android:focusable="true" />
-
-
-                                </LinearLayout>
-
-                            </LinearLayout>
-
-                            
-                        </LinearLayout>
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonCheckLatest"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Check latest" />
 
                     </LinearLayout>
                 </androidx.core.widget.NestedScrollView>
 
-                <LinearLayout
+                <!-- Bookmarks View -->
+                <androidx.core.widget.NestedScrollView
                     android:id="@+id/bookmarkManagerRoot"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp"
+                    android:maxHeight="@dimen/menu_max_height"
+                    android:fillViewport="false"
+                    android:clipToPadding="false"
+                    android:overScrollMode="ifContentScrolls"
                     android:visibility="gone">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/menu_padding_horizontal"
+                        android:paddingEnd="@dimen/menu_padding_horizontal"
+                        android:paddingTop="@dimen/menu_small_spacing"
+                        android:paddingBottom="@dimen/menu_padding_vertical">
 
-                        <TextView
-                            android:id="@+id/bookmarkManagerTitle"
-                            android:layout_width="0dp"
+                        <!-- Drag Handle -->
+                        <FrameLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/bookmark_manager_title"
-                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
+                            android:paddingTop="12dp"
+                            android:paddingBottom="16dp">
 
+                            <View
+                                android:layout_width="48dp"
+                                android:layout_height="5dp"
+                                android:layout_gravity="center_horizontal"
+                                android:background="@drawable/drag_handle_background" />
+                        </FrameLayout>
+
+                        <!-- Header Section -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="?attr/colorPrimaryContainer">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="16dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:baselineAligned="false">
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginEnd="12dp">
+
+                                        <TextView
+                                            android:id="@+id/bookmarkManagerTitle"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/bookmark_manager_title"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                                            android:textStyle="bold"
+                                            android:textColor="?attr/colorOnPrimaryContainer" />
+
+                                        <TextView
+                                            android:id="@+id/bookmarkManagerSubtitle"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:text="@string/bookmark_manager_subtitle"
+                                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                            android:textColor="?attr/colorOnPrimaryContainer"
+                                            android:alpha="0.8" />
+                                    </LinearLayout>
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonBookmarkManagerBack"
+                                        style="@style/Widget.Material3.Button.OutlinedButton"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/menu_back"
+                                        android:textColor="?attr/colorOnPrimaryContainer"
+                                        app:strokeColor="?attr/colorOnPrimaryContainer"
+                                        app:icon="@android:drawable/ic_menu_revert"
+                                        app:iconTint="?attr/colorOnPrimaryContainer"
+                                        app:iconGravity="start" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Add Bookmark Button -->
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/buttonBookmarkManagerBack"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="wrap_content"
+                            android:id="@+id/buttonBookmarkAdd"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="@string/bookmark_manager_close" />
-                    </LinearLayout>
+                            android:layout_marginTop="@dimen/menu_section_spacing"
+                            android:paddingVertical="14dp"
+                            android:text="@string/menu_bookmark_add"
+                            android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                            app:cornerRadius="@dimen/card_corner_radius"
+                            app:strokeWidth="1.5dp"
+                            app:strokeColor="?attr/colorPrimary"
+                            app:icon="@drawable/ic_bookmark_add"
+                            app:iconGravity="textStart"
+                            app:iconSize="24dp"
+                            app:iconPadding="12dp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/buttonBookmarkAdd"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:text="@string/menu_bookmark_add" />
-
-                    <ScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:overScrollMode="ifContentScrolls">
-
+                        <!-- Bookmarks List -->
                         <LinearLayout
                             android:id="@+id/bookmarkManagerList"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:orientation="vertical" />
-                    </ScrollView>
-                </LinearLayout>
+                            android:orientation="vertical"
+                            android:layout_marginTop="@dimen/menu_section_spacing" />
+
+                    </LinearLayout>
+                </androidx.core.widget.NestedScrollView>
+
+                <!-- QR Code View -->
+                <androidx.core.widget.NestedScrollView
+                    android:id="@+id/qrCodeViewRoot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="@dimen/menu_max_height"
+                    android:fillViewport="false"
+                    android:clipToPadding="false"
+                    android:overScrollMode="ifContentScrolls"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/menu_padding_horizontal"
+                        android:paddingEnd="@dimen/menu_padding_horizontal"
+                        android:paddingTop="@dimen/menu_small_spacing"
+                        android:paddingBottom="@dimen/menu_padding_vertical">
+
+                        <!-- Drag Handle -->
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="16dp">
+
+                            <View
+                                android:layout_width="48dp"
+                                android:layout_height="5dp"
+                                android:layout_gravity="center_horizontal"
+                                android:background="@drawable/drag_handle_background" />
+                        </FrameLayout>
+
+                        <!-- Header Section -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="?attr/colorPrimaryContainer">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="16dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:baselineAligned="false">
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginEnd="12dp">
+
+                                        <TextView
+                                            android:id="@+id/qrCodeViewTitle"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/qr_code_title"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                                            android:textStyle="bold"
+                                            android:textColor="?attr/colorOnPrimaryContainer" />
+
+                                        <TextView
+                                            android:id="@+id/qrCodeViewSubtitle"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:text="@string/qr_code_subtitle"
+                                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                            android:textColor="?attr/colorOnPrimaryContainer"
+                                            android:alpha="0.8" />
+                                    </LinearLayout>
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonQrCodeBack"
+                                        style="@style/Widget.Material3.Button.OutlinedButton"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/qr_code_back"
+                                        android:textColor="?attr/colorOnPrimaryContainer"
+                                        app:strokeColor="?attr/colorOnPrimaryContainer"
+                                        app:icon="@android:drawable/ic_menu_revert"
+                                        app:iconTint="?attr/colorOnPrimaryContainer"
+                                        app:iconGravity="start" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- QR Code Display Card -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_section_spacing"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="2dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerLowest">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:padding="24dp">
+
+                                <!-- QR Code Image -->
+                                <ImageView
+                                    android:id="@+id/qrCodeImage"
+                                    android:layout_width="280dp"
+                                    android:layout_height="280dp"
+                                    android:contentDescription="@string/qr_code_title"
+                                    android:scaleType="fitCenter"
+                                    android:background="@android:color/white"
+                                    android:padding="16dp" />
+
+                                <!-- URL Display -->
+                                <TextView
+                                    android:id="@+id/qrCodeUrl"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="16dp"
+                                    android:gravity="center"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                    android:textColor="?attr/colorOnSurfaceVariant"
+                                    android:maxLines="3"
+                                    android:ellipsize="middle" />
+
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                    </LinearLayout>
+                </androidx.core.widget.NestedScrollView>
+
+                <!-- Check for Latest View -->
+                <androidx.core.widget.NestedScrollView
+                    android:id="@+id/checkLatestViewRoot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxHeight="@dimen/menu_max_height"
+                    android:fillViewport="false"
+                    android:clipToPadding="false"
+                    android:overScrollMode="ifContentScrolls"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingStart="@dimen/menu_padding_horizontal"
+                        android:paddingEnd="@dimen/menu_padding_horizontal"
+                        android:paddingTop="@dimen/menu_small_spacing"
+                        android:paddingBottom="@dimen/menu_padding_vertical">
+
+                        <!-- Drag Handle -->
+                        <FrameLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:paddingTop="12dp"
+                            android:paddingBottom="16dp">
+
+                            <View
+                                android:layout_width="48dp"
+                                android:layout_height="5dp"
+                                android:layout_gravity="center_horizontal"
+                                android:background="@drawable/drag_handle_background" />
+                        </FrameLayout>
+
+                        <!-- Header Section -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="?attr/colorPrimaryContainer">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="16dp">
+
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:baselineAligned="false">
+
+                                    <LinearLayout
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_weight="1"
+                                        android:orientation="vertical"
+                                        android:layout_marginEnd="12dp">
+
+                                        <TextView
+                                            android:id="@+id/checkLatestViewTitle"
+                                            android:layout_width="wrap_content"
+                                            android:layout_height="wrap_content"
+                                            android:text="@string/check_latest_title"
+                                            android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                                            android:textStyle="bold"
+                                            android:textColor="?attr/colorOnPrimaryContainer" />
+
+                                        <TextView
+                                            android:id="@+id/checkLatestViewSubtitle"
+                                            android:layout_width="match_parent"
+                                            android:layout_height="wrap_content"
+                                            android:layout_marginTop="4dp"
+                                            android:text="@string/check_latest_subtitle"
+                                            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                            android:textColor="?attr/colorOnPrimaryContainer"
+                                            android:alpha="0.8" />
+                                    </LinearLayout>
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonCheckLatestBack"
+                                        style="@style/Widget.Material3.Button.OutlinedButton"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="@string/check_latest_back"
+                                        android:textColor="?attr/colorOnPrimaryContainer"
+                                        app:strokeColor="?attr/colorOnPrimaryContainer"
+                                        app:icon="@android:drawable/ic_menu_revert"
+                                        app:iconTint="?attr/colorOnPrimaryContainer"
+                                        app:iconGravity="start" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- Version Information Card -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_section_spacing"
+                            app:cardCornerRadius="@dimen/card_corner_radius"
+                            app:cardElevation="0dp"
+                            app:strokeWidth="1dp"
+                            app:strokeColor="?attr/colorOutlineVariant"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerLowest">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="20dp">
+
+                                <TextView
+                                    android:id="@+id/checkLatestInstalledVersion"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                                    android:text="Installed: v0.0.0"
+                                    android:layout_marginBottom="12dp"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <TextView
+                                    android:id="@+id/checkLatestLatestVersion"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                                    android:text="@string/menu_checking_latest"
+                                    android:textColor="?attr/colorOnSurface" />
+
+                                <ProgressBar
+                                    android:id="@+id/checkLatestProgressIndicator"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="16dp"
+                                    android:indeterminate="true"
+                                    android:visibility="gone"
+                                    style="?android:attr/progressBarStyleHorizontal" />
+
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <!-- View Release Button -->
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/checkLatestOpenReleaseButton"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/menu_item_spacing"
+                            android:text="@string/check_latest_view_release"
+                            android:paddingTop="16dp"
+                            android:paddingBottom="16dp"
+                            app:icon="@android:drawable/ic_menu_view"
+                            app:iconGravity="start" />
+
+                    </LinearLayout>
+                </androidx.core.widget.NestedScrollView>
             </FrameLayout>
         </com.google.android.material.card.MaterialCardView>
 
-            </FrameLayout>
+    </FrameLayout>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/menuFab"
@@ -354,6 +879,7 @@
         android:contentDescription="@string/menu_open_description"
         app:srcCompat="@android:drawable/ic_menu_more"
         app:tint="?attr/colorOnPrimary"
-        app:backgroundTint="?attr/colorPrimary" />
+        app:backgroundTint="?attr/colorPrimary"
+        app:elevation="6dp" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

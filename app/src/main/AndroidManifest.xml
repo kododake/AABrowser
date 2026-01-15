@@ -46,10 +46,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".CheckLatestActivity"
-            android:exported="false"
-            android:label="Check latest" />
 
         <service
             android:name=".AABrowserCarAppService"

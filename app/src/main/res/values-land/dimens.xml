@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Landscape Layout Dimensions -->
+    <dimen name="menu_max_height">450dp</dimen>
+    <dimen name="menu_padding_vertical">16dp</dimen>
+</resources>
+

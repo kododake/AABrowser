@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tablet Layout Dimensions (600dp+) -->
+    <dimen name="menu_card_corner_radius">32dp</dimen>
+    <dimen name="menu_card_elevation">12dp</dimen>
+    <dimen name="menu_padding_horizontal">32dp</dimen>
+    <dimen name="menu_padding_vertical">32dp</dimen>
+    <dimen name="menu_max_height">700dp</dimen>
+
+    <!-- Content Spacing -->
+    <dimen name="menu_section_spacing">24dp</dimen>
+    <dimen name="menu_item_spacing">20dp</dimen>
+    <dimen name="menu_small_spacing">12dp</dimen>
+
+    <!-- UI Elements -->
+    <dimen name="button_corner_radius">20dp</dimen>
+    <dimen name="card_corner_radius">20dp</dimen>
+    <dimen name="drag_handle_width">48dp</dimen>
+    <dimen name="drag_handle_height">5dp</dimen>
+
+    <!-- Button Sizes -->
+    <dimen name="icon_button_size">56dp</dimen>
+    <dimen name="icon_size_small">24dp</dimen>
+    <dimen name="icon_size_medium">28dp</dimen>
+</resources>
+
