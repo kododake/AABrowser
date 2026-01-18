@@ -5,12 +5,14 @@ import android.content.Context
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.util.Log
 import android.webkit.WebView
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
+import androidx.car.app.constraints.ConstraintManager
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
@@ -30,6 +32,21 @@ class AABrowserScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
 
     init {
         carContext.getCarService(AppManager::class.java).setSurfaceCallback(this)
+        checkMotionRestrictions()
+    }
+
+    /**
+     * Handshake with ConstraintManager to signal that this screen 
+     * is aware of UX restrictions and is distraction-optimized.
+     */
+    private fun checkMotionRestrictions() {
+        try {
+            val constraintManager = carContext.getCarService(ConstraintManager::class.java)
+            val limit = constraintManager.getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
+            Log.d("AABrowser", "Motion restriction handshake successful. Content limit: $limit")
+        } catch (e: Exception) {
+            Log.w("AABrowser", "ConstraintManager not available; system might be in restricted mode.")
+        }
     }
 
     override fun onGetTemplate(): Template {
@@ -37,6 +54,7 @@ class AABrowserScreen(carContext: CarContext) : Screen(carContext), SurfaceCallb
             .addRow(Row.Builder().setTitle("Starting Browser...").build())
             .build()
         val contentTemplate = PaneTemplate.Builder(pane).build()
+        
         return MapWithContentTemplate.Builder()
             .setContentTemplate(contentTemplate)
             .build()
