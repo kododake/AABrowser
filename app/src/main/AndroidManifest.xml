@@ -20,43 +20,66 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.AABrowser">
         <meta-data
+            android:name="distractionOptimized"
+            android:value="true" />
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="4.0" />
+        <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="1" />
+            android:value="7" />
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode|layoutDirection|locale"
             android:launchMode="singleTop"
             android:exported="true"
+            android:resizeableActivity="true"
             android:label="@string/app_name"
-            android:theme="@style/Theme.AABrowser"
-            android:configChanges="uiMode|orientation|screenSize">
+            android:theme="@style/Theme.AABrowser">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.CAR_LAUNCHER" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <category android:name="android.intent.category.APP_MAPS" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+                <category android:name="android.intent.category.APP_MAPS" />
 
                 <data android:scheme="http" />
                 <data android:scheme="https" />
             </intent-filter>
+            <layout
+                android:minWidth="1dp"
+                android:minHeight="1dp"
+                android:gravity="fill"
+                android:defaultWidth="800dp"
+                android:defaultHeight="480dp" />
+            <meta-data android:name="distractionOptimized" android:value="true" />
+            <meta-data android:name="android.max_aspect" android:value="5.0" />
         </activity>
 
 
-        <service
-            android:name=".AABrowserCarAppService"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:icon="@mipmap/ic_launcher">
-            <intent-filter>
-                <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.POI" />
-            </intent-filter>
-        </service>
+        <activity
+            android:name=".settings.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_title"
+            android:theme="@style/Theme.AABrowser" />
+
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AABrowser" />
+
+
     </application>
 
 </manifest>

@@ -42,7 +42,8 @@
     }
 
     const failed = decodeURIComponent(getParam('failedUrl') || '')
-    const code = getParam('code') || ''
+    const httpStatus = getParam('httpStatus') || ''
+    const code = getParam('code') || httpStatus || ''
     const message = decodeURIComponent(getParam('message') || '')
 
     if (code || message) {

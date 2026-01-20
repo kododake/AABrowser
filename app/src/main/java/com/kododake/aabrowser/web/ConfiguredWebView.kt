@@ -21,6 +21,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.net.toUri
 import com.kododake.aabrowser.R
+import com.kododake.aabrowser.model.UserAgentProfile
 
 data class BrowserCallbacks(
     val onUrlChange: (String) -> Unit = {},
@@ -41,14 +42,15 @@ data class BrowserCallbacks(
 fun configureWebView(
     webView: WebView,
     callbacks: BrowserCallbacks = BrowserCallbacks(),
-    useDesktopMode: Boolean = false
+    useDesktopMode: Boolean = false,
+    userAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
 ) {
     with(webView) {
-    setBackgroundColor(Color.BLACK)
-    isHorizontalScrollBarEnabled = false
-    isVerticalScrollBarEnabled = true
+        setBackgroundColor(Color.BLACK)
+        isHorizontalScrollBarEnabled = false
+        isVerticalScrollBarEnabled = true
 
-    WebView.setWebContentsDebuggingEnabled(false)
+        WebView.setWebContentsDebuggingEnabled(false)
 
         val originalUserAgent = settings.userAgentString
         setTag(R.id.webview_original_user_agent_tag, originalUserAgent)
@@ -60,14 +62,13 @@ fun configureWebView(
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
-            loadWithOverviewMode = true
-            useWideViewPort = true
+            loadWithOverviewMode = useDesktopMode
+            useWideViewPort = useDesktopMode
             cacheMode = WebSettings.LOAD_DEFAULT
             allowContentAccess = true
             allowFileAccess = false
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            userAgentString = buildUserAgent(originalUserAgent, useDesktopMode)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 safeBrowsingEnabled = true
             }
@@ -75,6 +76,7 @@ fun configureWebView(
                 offscreenPreRaster = true
             }
         }
+        applyUserAgent(userAgentProfile, useDesktopMode)
         val scale = context.resources.displayMetrics.density * 100
         setInitialScale(scale.toInt())
 
@@ -200,18 +202,21 @@ fun configureWebView(
                 if (request.isForMainFrame) {
                     val status = try { errorResponse.statusCode } catch (_: Exception) { -1 }
                     val reason = errorResponse.reasonPhrase ?: ""
+
+                    if (status == 429) {
+                        return
+                    }
+
                     val failed = request.url?.toString().orEmpty()
-                    val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&httpStatus=$status&message=${Uri.encode(reason)}"
+                    val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&httpStatus=$status&code=$status&message=${Uri.encode(reason)}"
                     try {
                         view.loadUrl(assetUrl)
                         return
-                    } catch (_: Exception) {
-
-                    }
+                    } catch (_: Exception) {}
+                    
                     callbacks.onError(status, reason)
                     return
                 }
-
             }
 
             override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
@@ -223,41 +228,10 @@ fun configureWebView(
                     view.loadUrl(assetUrl)
                     handler.cancel()
                     return
-                } catch (_: Exception) {
-
-                }
+                } catch (_: Exception) {}
+                
                 handler.cancel()
                 callbacks.onError(primary, message)
-            }
-
-            override fun onReceivedError(
-                view: WebView,
-                errorCode: Int,
-                description: String?,
-                failingUrl: String?
-            ) {
-                val shouldShowErrorPage = when (errorCode) {
-                    WebViewClient.ERROR_HOST_LOOKUP,
-                    WebViewClient.ERROR_CONNECT,
-                    WebViewClient.ERROR_TIMEOUT,
-                    WebViewClient.ERROR_UNKNOWN,
-                    WebViewClient.ERROR_PROXY_AUTHENTICATION -> true
-                    else -> false
-                }
-
-                if (shouldShowErrorPage) {
-                    val failed = failingUrl.orEmpty()
-                    val message = description.orEmpty()
-                    val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&code=$errorCode&message=${Uri.encode(message)}"
-                    try {
-                        view.loadUrl(assetUrl)
-                        return
-                    } catch (_: Exception) {
-                        
-                    }
-                }
-
-                callbacks.onError(errorCode, description)
             }
         }
 
@@ -291,7 +265,7 @@ fun configureWebView(
 
                 val grantable = request.resources.filter { resource ->
                     resource == PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID
-                    }
+                }
                     .toTypedArray()
 
                 if (grantable.isEmpty()) {
@@ -319,11 +293,13 @@ fun configureWebView(
     }
 }
 
-fun WebView.updateDesktopMode(enable: Boolean) {
-    val originalUa = getTag(R.id.webview_original_user_agent_tag) as? String ?: settings.userAgentString
-    settings.userAgentString = buildUserAgent(originalUa, enable)
-    settings.useWideViewPort = enable
-    settings.loadWithOverviewMode = enable
+fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
+    applyUserAgent(profile, enable)
+    reload()
+}
+
+fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
+    applyUserAgent(profile, desktop)
     reload()
 }
 
@@ -334,15 +310,22 @@ fun WebView.releaseCompletely() {
     destroy()
 }
 
-private const val CUSTOM_USER_AGENT_SUFFIX = "AndroidAutoBrowser/1.0"
-private const val MOBILE_USER_AGENT = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36"
-private const val DESKTOP_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+private fun WebView.applyUserAgent(profile: UserAgentProfile, desktop: Boolean) {
+    setTag(R.id.webview_user_agent_profile_tag, profile.storageKey)
+    settings.userAgentString = buildUserAgent(profile, desktop)
+    settings.useWideViewPort = desktop
+    settings.loadWithOverviewMode = desktop
+}
 
-private fun buildUserAgent(base: String, desktop: Boolean): String {
-    val resolved = if (desktop) DESKTOP_USER_AGENT else MOBILE_USER_AGENT
-    return if (resolved.contains(CUSTOM_USER_AGENT_SUFFIX)) {
-        resolved
-    } else {
-        "$resolved $CUSTOM_USER_AGENT_SUFFIX"
+private fun buildUserAgent(profile: UserAgentProfile, desktop: Boolean): String {
+    return when (profile) {
+        UserAgentProfile.ANDROID_CHROME -> if (desktop) WINDOWS_CHROME_UA else MOBILE_CHROME_UA
+        UserAgentProfile.SAFARI -> if (desktop) SAFARI_MAC_UA else SAFARI_IOS_UA
     }
 }
+
+private const val CHROME_VERSION = "143.0.0.0"
+private const val MOBILE_CHROME_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Mobile Safari/537.36"
+private const val WINDOWS_CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Safari/537.36"
+private const val SAFARI_MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+private const val SAFARI_IOS_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"

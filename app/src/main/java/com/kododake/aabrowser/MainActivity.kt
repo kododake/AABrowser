@@ -4,13 +4,16 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.content.pm.ApplicationInfo
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
+import android.util.TypedValue
 import android.view.ContextThemeWrapper
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -20,6 +23,7 @@ import android.webkit.WebChromeClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
+import com.kododake.aabrowser.analytics.UmamiTracker
 import com.google.android.material.color.DynamicColors
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -28,15 +32,19 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.databinding.ActivityMainBinding
+import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.web.BrowserCallbacks
 import com.kododake.aabrowser.web.configureWebView
 import com.kododake.aabrowser.web.releaseCompletely
 import com.kododake.aabrowser.web.updateDesktopMode
+import com.kododake.aabrowser.web.updateUserAgentProfile
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textview.MaterialTextView
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.common.BitMatrix
+import android.widget.RadioGroup
+import com.kododake.aabrowser.settings.SettingsViews
 
 class MainActivity : AppCompatActivity() {
 
@@ -45,27 +53,31 @@ class MainActivity : AppCompatActivity() {
         (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     }
     private val handler = Handler(Looper.getMainLooper())
-    private val autoHideMenuFab = Runnable { binding.menuFab.hide() }
+    private val autoHideMenuFab = Runnable {
+        if (::binding.isInitialized) binding.menuFab.hide()
+    }
     private val showMenuFabRunnable = Runnable {
-        if (isInFullscreen() || binding.menuOverlay.isVisible) {
-            return@Runnable
-        }
+        if (!::binding.isInitialized) return@Runnable
+        if (isInFullscreen() || binding.menuOverlay.isVisible) return@Runnable
         binding.menuFab.show()
         handler.postDelayed(autoHideMenuFab, MENU_BUTTON_AUTO_HIDE_DELAY_MS)
     }
     private var webView: android.webkit.WebView? = null
     private var currentUrl: String = BrowserPreferences.defaultUrl()
+    private var currentUserAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var isShowingCleartextDialog: Boolean = false
     private var latestReleaseUrl: String = "https://github.com/kododake/AABrowser/releases"
-
+    private val umamiTracker: UmamiTracker by lazy { UmamiTracker(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DynamicColors.applyToActivityIfAvailable(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        umamiTracker.trackEvent("app_open")
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             val disp = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -96,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         webView?.onResume()
         refreshBookmarks()
+        syncUserAgentProfile()
     }
 
     override fun onPause() {
@@ -113,11 +126,18 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    private fun resolveThemeColor(attrRes: Int): Int {
+        val typedValue = TypedValue()
+        theme.resolveAttribute(attrRes, typedValue, true)
+        return typedValue.data
+    }
+
     private fun setupUi() {
         val intentUrl = extractBrowsableUrl(intent)
         val initialUrl = intentUrl ?: BrowserPreferences.resolveInitialUrl(this)
         currentUrl = initialUrl
         val desktopMode = BrowserPreferences.shouldUseDesktopMode(this)
+        currentUserAgentProfile = BrowserPreferences.getUserAgentProfile(this)
 
         binding.menuFab.hide()
 
@@ -131,6 +151,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     BrowserPreferences.persistUrl(this, url)
                     updateNavigationButtons()
+                    updateConnectionSecurityIcon(url)
                 }
             },
             onTitleChange = { title ->
@@ -151,8 +172,7 @@ class MainActivity : AppCompatActivity() {
                     if (isShowingCleartextDialog) return@runOnUiThread
                     isShowingCleartextDialog = true
                     val host = uri.host ?: uri.toString()
-                    val inflater = layoutInflater
-                    val view = inflater.inflate(R.layout.dialog_cleartext_confirmation, null)
+                    val view = layoutInflater.inflate(R.layout.dialog_cleartext_confirmation, null)
                     val titleView = view.findViewById<android.widget.TextView>(R.id.cleartext_title)
                     val messageView = view.findViewById<android.widget.TextView>(R.id.cleartext_message)
                     titleView.text = "Insecure connection"
@@ -163,35 +183,24 @@ class MainActivity : AppCompatActivity() {
                         com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog
                     ).setView(view).create()
 
-                    dialog.setOnDismissListener {
-                        isShowingCleartextDialog = false
-                    }
+                    dialog.setOnDismissListener { isShowingCleartextDialog = false }
 
-                    val btnCancel = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_cancel_dialog)
-                    val btnAllowOnce = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_allow_once)
-                    val btnAllowhost = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_allow_host)
-
-                    btnCancel.setOnClickListener {
+                    view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_cancel_dialog).setOnClickListener {
                         try { dialog.dismiss() } catch (_: Exception) {}
                         cancel()
                     }
-
-                    btnAllowOnce.setOnClickListener {
+                    view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_allow_once).setOnClickListener {
                         try { dialog.dismiss() } catch (_: Exception) {}
                         allowOnce()
                     }
-
-                    btnAllowhost.setOnClickListener {
+                    view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_allow_host).setOnClickListener {
                         try { dialog.dismiss() } catch (_: Exception) {}
                         allowhostPermanently()
                     }
-
                     try {
                         dialog.show()
-                        val w = dialog.window
-                        val metrics = resources.displayMetrics
-                        val width = (metrics.widthPixels * 0.9).toInt()
-                        w?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+                        val width = (resources.displayMetrics.widthPixels * 0.9).toInt()
+                        dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
                     } catch (e: Exception) {
                         isShowingCleartextDialog = false
                         cancel()
@@ -216,16 +225,12 @@ class MainActivity : AppCompatActivity() {
 
         webView = binding.webView
         webView?.let { view ->
-            configureWebView(view, callbacks, desktopMode)
+            configureWebView(view, callbacks, desktopMode, currentUserAgentProfile)
             view.addJavascriptInterface(object {
                 @android.webkit.JavascriptInterface
                 fun openExternal(url: String) {
                     if (url.isNullOrBlank()) return
-                    runOnUiThread {
-                        runCatching {
-                            openUriExternally(Uri.parse(url))
-                        }
-                    }
+                    runOnUiThread { runCatching { openUriExternally(Uri.parse(url)) } }
                 }
             }, "Android")
             view.setOnTouchListener { _, _ ->
@@ -235,6 +240,8 @@ class MainActivity : AppCompatActivity() {
             view.loadUrl(initialUrl)
         }
 
+        updateConnectionSecurityIcon(initialUrl)
+
         if (intentUrl != null) {
             BrowserPreferences.persistUrl(this, initialUrl)
         }
@@ -242,13 +249,8 @@ class MainActivity : AppCompatActivity() {
         binding.desktopSwitch.isChecked = desktopMode
         binding.desktopSwitch.setOnCheckedChangeListener { _, isChecked ->
             BrowserPreferences.setDesktopMode(this, isChecked)
-            webView?.updateDesktopMode(isChecked)
+            webView?.updateDesktopMode(isChecked, currentUserAgentProfile)
         }
-
-        binding.menuFab.setOnClickListener { showMenuOverlay() }
-        binding.menuOverlayScrim.setOnClickListener { hideMenuOverlay() }
-        binding.menuCard.setOnClickListener { /* consume click */ }
-        setupMenuSwipeToClose()
 
         binding.addressEdit.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_GO) {
@@ -259,7 +261,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Show/hide clear button based on text content
         binding.addressEdit.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -268,26 +269,11 @@ class MainActivity : AppCompatActivity() {
                 if (hasText && binding.buttonClearAddress.visibility != View.VISIBLE) {
                     binding.buttonClearAddress.visibility = View.VISIBLE
                     binding.buttonClearAddress.alpha = 0f
-                    binding.buttonClearAddress.scaleX = 0.8f
-                    binding.buttonClearAddress.scaleY = 0.8f
-                    binding.buttonClearAddress.animate()
-                        .alpha(1f)
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(150)
-                        .setInterpolator(android.view.animation.DecelerateInterpolator())
-                        .start()
+                    binding.buttonClearAddress.animate().alpha(1f).setDuration(150).start()
                 } else if (!hasText && binding.buttonClearAddress.visibility == View.VISIBLE) {
-                    binding.buttonClearAddress.animate()
-                        .alpha(0f)
-                        .scaleX(0.8f)
-                        .scaleY(0.8f)
-                        .setDuration(100)
-                        .setInterpolator(android.view.animation.AccelerateInterpolator())
-                        .withEndAction {
-                            binding.buttonClearAddress.visibility = View.GONE
-                        }
-                        .start()
+                    binding.buttonClearAddress.animate().alpha(0f).setDuration(100).withEndAction {
+                        binding.buttonClearAddress.visibility = View.GONE
+                    }.start()
                 }
             }
         })
@@ -298,197 +284,108 @@ class MainActivity : AppCompatActivity() {
             showKeyboard(binding.addressEdit)
         }
 
-
-        binding.buttonClose.setOnClickListener { hideMenuOverlay() }
         binding.buttonGo.setOnClickListener { navigateToAddress() }
-        binding.buttonReload.setOnClickListener { webView?.reload() }
+
+        binding.buttonReload.setOnClickListener {
+            webView?.reload()
+            hideMenuOverlay()
+        }
+
         binding.buttonBack.setOnClickListener {
-            webView?.let {
-                if (it.canGoBack()) {
-                    it.goBack()
-                }
-            }
+            webView?.let { if (it.canGoBack()) it.goBack() }
             updateNavigationButtons()
         }
+
         binding.buttonForward.setOnClickListener {
-            webView?.let {
-                if (it.canGoForward()) {
-                    it.goForward()
-                }
-            }
+            webView?.let { if (it.canGoForward()) it.goForward() }
             updateNavigationButtons()
         }
-        binding.buttonExternal.setOnClickListener {
-            showQrCodeView()
+
+        val tonalIconColor = resolveThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
+        val tonalColorStateList = android.content.res.ColorStateList.valueOf(tonalIconColor)
+        val primaryColor = resolveThemeColor(androidx.appcompat.R.attr.colorPrimary)
+        val primaryColorStateList = android.content.res.ColorStateList.valueOf(primaryColor)
+
+        val navButtons = listOf(
+            binding.buttonBack, binding.buttonReload, binding.buttonForward,
+            binding.buttonBookmarks, binding.buttonSettings, binding.buttonExternalGithub
+        )
+
+        navButtons.forEach { btn ->
+            btn.isEnabled = true
+            btn.isClickable = true
+            btn.iconTint = tonalColorStateList
         }
 
-        binding.buttonExternalGithub.setOnClickListener {
-            openUriExternally(Uri.parse(GITHUB_REPO_URL))
-        }
-
-
+        binding.buttonExternal.setOnClickListener { showQrCodeView() }
+        binding.buttonExternalGithub.iconTint = primaryColorStateList
+        binding.buttonExternalGithub.setOnClickListener { openUriExternally(Uri.parse(GITHUB_REPO_URL)) }
         binding.buttonBookmarks.setOnClickListener { showBookmarkManager() }
         binding.buttonBookmarkManagerBack.setOnClickListener { hideBookmarkManager() }
         binding.buttonBookmarkAdd.setOnClickListener { addBookmarkForCurrentPage() }
-
         binding.buttonQrCodeBack.setOnClickListener { hideQrCodeView() }
-
-        binding.buttonCheckLatest.setOnClickListener {
-            showCheckLatestView()
+        binding.buttonQrCopy.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("URL", currentUrl))
+            Toast.makeText(this, "Copied URL", Toast.LENGTH_SHORT).show()
         }
+        binding.buttonQrExternalBrowser.setOnClickListener {
+            openUriExternally(Uri.parse(currentUrl))
+            hideMenuOverlay()
+        }
+        binding.buttonCheckLatest.setOnClickListener { showCheckLatestView() }
         binding.buttonCheckLatestBack.setOnClickListener { hideCheckLatestView() }
         binding.checkLatestOpenReleaseButton.setOnClickListener {
             openUriExternally(Uri.parse(latestReleaseUrl))
+            hideMenuOverlay()
         }
+        binding.buttonSettings.setOnClickListener { showSettingsView() }
+
+        binding.menuFab.setOnClickListener { showMenuOverlay() }
+        binding.buttonClose.setOnClickListener { hideMenuOverlay() }
+        binding.menuOverlayScrim.setOnClickListener { hideMenuOverlay() }
+
+        setupManualDragLogic()
 
         updateNavigationButtons()
         showMenuButtonTemporarily()
         refreshBookmarks()
 
         try {
-            val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getPackageInfo(
-                    packageName,
-                    android.content.pm.PackageManager.PackageInfoFlags.of(0L)
-                )
-            } else {
-                packageManager.getPackageInfo(packageName, 0)
-            }
-            val versionName = pInfo.versionName ?: ""
-            binding.menuVersion.text = getString(R.string.installed_version_label, "v$versionName")
-        } catch (_: Exception) {
-            
-        }
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            binding.menuVersion.text = getString(R.string.installed_version_label, "v${pInfo.versionName}")
+        } catch (_: Exception) {}
     }
 
-    private fun setupBackPressHandling() {
-        onBackPressedDispatcher.addCallback(this) {
-            when {
-                isInFullscreen() -> exitFullscreen()
-                binding.checkLatestViewRoot.isVisible -> hideCheckLatestView()
-                binding.qrCodeViewRoot.isVisible -> hideQrCodeView()
-                binding.bookmarkManagerRoot.isVisible -> hideBookmarkManager()
-                binding.menuOverlay.isVisible -> hideMenuOverlay()
-                webView?.canGoBack() == true -> webView?.goBack()
-                else -> {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
-                }
-            }
-            updateNavigationButtons()
-        }
-    }
-
-    private fun navigateToAddress() {
-        val raw = binding.addressEdit.text?.toString().orEmpty()
-        val navigable = BrowserPreferences.formatNavigableUrl(raw)
-        currentUrl = navigable
-        BrowserPreferences.persistUrl(this, navigable)
-        webView?.loadUrl(navigable)
-        hideMenuOverlay()
-    }
-
-    private fun loadUrlFromIntent(rawUrl: String) {
-        val trimmed = rawUrl.trim()
-        if (trimmed.isEmpty()) return
-        val navigable = BrowserPreferences.formatNavigableUrl(trimmed)
-        currentUrl = navigable
-        BrowserPreferences.persistUrl(this, navigable)
-        binding.addressEdit.setText(navigable)
-        binding.addressEdit.setSelection(binding.addressEdit.text?.length ?: 0)
-        webView?.loadUrl(navigable) ?: binding.webView.loadUrl(navigable)
-        hideBookmarkManager()
-        hideCheckLatestView()
-        hideQrCodeView()
-        hideMenuOverlay()
-        showMenuButtonTemporarily()
-    }
-
-    private fun updateNavigationButtons() {
-        binding.buttonBack.isEnabled = webView?.canGoBack() == true
-        binding.buttonForward.isEnabled = webView?.canGoForward() == true
-    }
-
-    private fun updateProgress(progress: Int) {
-        val indicator = binding.progressIndicator
-        if (progress in 1..99) {
-            if (!indicator.isVisible) {
-                indicator.visibility = View.VISIBLE
-            }
-            indicator.setProgressCompat(progress, true)
-        } else {
-            indicator.visibility = View.GONE
-        }
-    }
-
-    private fun showMenuOverlay() {
-        hideBookmarkManager()
-        hideCheckLatestView()
-        hideQrCodeView()
-        binding.menuOverlay.visibility = View.VISIBLE
-        binding.menuFab.hide()
-        handler.removeCallbacks(showMenuFabRunnable)
-        handler.removeCallbacks(autoHideMenuFab)
-
-        // Material Design Expressive - spring animation with overshoot
-        binding.menuCard.translationY = binding.menuCard.height.toFloat() + 100f
-        binding.menuCard.alpha = 0f
-        binding.menuCard.scaleX = 0.95f
-        binding.menuCard.scaleY = 0.95f
-        binding.menuOverlayScrim.alpha = 0f
-
-        // Expressive entrance with spring-like overshoot
-        binding.menuCard.animate()
-            .translationY(0f)
-            .alpha(1f)
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(400)
-            .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
-            .start()
-
-        binding.menuOverlayScrim.animate()
-            .alpha(1f)
-            .setDuration(300)
-            .start()
-
-        refreshBookmarks()
-    }
-
-    @android.annotation.SuppressLint("ClickableViewAccessibility")
-    private fun setupMenuSwipeToClose() {
+    private fun setupManualDragLogic() {
         var startY = 0f
-        var startTranslationY = 0f
-        val swipeThreshold = resources.displayMetrics.density * 100 // 100dp threshold
+        var initialTranslationY = 0f
+        val swipeThreshold = 250f
 
-        binding.menuCard.setOnTouchListener { view, event ->
+        binding.dragHandleArea.setOnTouchListener { _, event ->
             when (event.action) {
-                android.view.MotionEvent.ACTION_DOWN -> {
+                MotionEvent.ACTION_DOWN -> {
                     startY = event.rawY
-                    startTranslationY = view.translationY
+                    initialTranslationY = binding.menuCard.translationY
                     true
                 }
-                android.view.MotionEvent.ACTION_MOVE -> {
+                MotionEvent.ACTION_MOVE -> {
                     val deltaY = event.rawY - startY
-                    if (deltaY > 0) { // Only allow downward swipe
-                        view.translationY = startTranslationY + deltaY
-                        // Fade scrim based on swipe progress
-                        val progress = (deltaY / view.height).coerceIn(0f, 1f)
+                    if (deltaY > 0) {
+                        binding.menuCard.translationY = initialTranslationY + deltaY
+                        val progress = (deltaY / binding.menuCard.height.coerceAtLeast(1)).coerceIn(0f, 1f)
                         binding.menuOverlayScrim.alpha = 1f - progress
                     }
                     true
                 }
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    val deltaY = event.rawY - startY
-                    if (deltaY > swipeThreshold) {
-                        // Swipe exceeded threshold - close the menu
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    val totalDeltaY = event.rawY - startY
+                    if (totalDeltaY > swipeThreshold) {
                         hideMenuOverlay()
                     } else {
-                        // Snap back to original position
-                        view.animate()
+                        binding.menuCard.animate()
                             .translationY(0f)
                             .setDuration(200)
-                            .setInterpolator(android.view.animation.DecelerateInterpolator())
                             .start()
                         binding.menuOverlayScrim.animate()
                             .alpha(1f)
@@ -502,53 +399,114 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun hideMenuOverlay() {
-            if (binding.menuOverlay.visibility == View.VISIBLE) {
-            hideKeyboard(binding.addressEdit)
-
-            // Animate menu card sliding down
-            binding.menuCard.animate()
-                .translationY(binding.menuCard.height.toFloat())
-                .alpha(0f)
-                .setDuration(250)
-                .setInterpolator(android.view.animation.AccelerateInterpolator(2f))
-                .withEndAction {
-                    binding.menuOverlay.visibility = View.GONE
-                    hideBookmarkManager()
-                    hideCheckLatestView()
-                    hideQrCodeView()
+    private fun setupBackPressHandling() {
+        onBackPressedDispatcher.addCallback(this) {
+            when {
+                isInFullscreen() -> exitFullscreen()
+                binding.checkLatestViewRoot.isVisible -> hideCheckLatestView()
+                binding.qrCodeViewRoot.isVisible -> hideQrCodeView()
+                binding.bookmarkManagerRoot.isVisible -> hideBookmarkManager()
+                binding.settingsViewRoot.isVisible -> hideSettingsView()
+                binding.menuOverlay.isVisible -> hideMenuOverlay()
+                webView?.canGoBack() == true -> webView?.goBack()
+                else -> {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
                 }
-                .start()
-
-            binding.menuOverlayScrim.animate()
-                .alpha(0f)
-                .setDuration(200)
-                .start()
-
-            showMenuButtonTemporarily()
+            }
+            updateNavigationButtons()
         }
+    }
+
+    private fun syncUserAgentProfile() {
+        val latestProfile = BrowserPreferences.getUserAgentProfile(this)
+        if (latestProfile == currentUserAgentProfile) return
+        currentUserAgentProfile = latestProfile
+        webView?.updateUserAgentProfile(latestProfile, BrowserPreferences.shouldUseDesktopMode(this))
+    }
+
+    private fun navigateToAddress() {
+        val raw = binding.addressEdit.text?.toString().orEmpty()
+        val navigable = BrowserPreferences.formatNavigableUrl(raw)
+        currentUrl = navigable
+        BrowserPreferences.persistUrl(this, navigable)
+        webView?.loadUrl(navigable)
+        hideMenuOverlay()
+    }
+
+    private fun loadUrlFromIntent(rawUrl: String) {
+        val navigable = BrowserPreferences.formatNavigableUrl(rawUrl.trim())
+        if (navigable.isEmpty()) return
+        currentUrl = navigable
+        BrowserPreferences.persistUrl(this, navigable)
+        binding.addressEdit.setText(navigable)
+        webView?.loadUrl(navigable)
+        hideMenuOverlay()
+    }
+
+    private fun updateNavigationButtons() {
+        binding.buttonBack.isEnabled = webView?.canGoBack() == true
+        binding.buttonForward.isEnabled = webView?.canGoForward() == true
+    }
+
+    private fun updateConnectionSecurityIcon(url: String?) {
+        val isSecure = try { url?.lowercase()?.startsWith("https://") == true } catch (_: Exception) { false }
+        binding.addressSecureIcon.visibility = if (isSecure) View.VISIBLE else View.GONE
+        binding.addressInsecureIcon.visibility = if (isSecure) View.GONE else View.VISIBLE
+    }
+
+    private fun updateProgress(progress: Int) {
+        binding.progressIndicator.visibility = if (progress in 1..99) View.VISIBLE else View.GONE
+        if (progress in 1..99) binding.progressIndicator.setProgressCompat(progress, true)
+    }
+
+    private fun showMenuOverlay() {
+        binding.menuOverlay.visibility = View.VISIBLE
+        binding.menuCard.post {
+            binding.menuCard.translationY = binding.menuCard.height.toFloat()
+            binding.menuCard.animate()
+                .translationY(0f)
+                .setDuration(300)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+            binding.menuOverlayScrim.animate()
+                .alpha(1f)
+                .setDuration(300)
+                .start()
+        }
+        handler.removeCallbacks(showMenuFabRunnable)
+        binding.menuFab.hide()
+        refreshBookmarks()
+    }
+
+    private fun hideMenuOverlay() {
+        hideKeyboard(binding.addressEdit)
+        binding.menuCard.animate()
+            .translationY(binding.menuCard.height.toFloat())
+            .setDuration(250)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                binding.menuOverlay.visibility = View.GONE
+                hideBookmarkManager()
+                hideCheckLatestView()
+                hideQrCodeView()
+                hideSettingsView()
+                showMenuButtonTemporarily()
+            }
+            .start()
+        binding.menuOverlayScrim.animate().alpha(0f).setDuration(200).start()
     }
 
     private fun showMenuButtonTemporarily() {
         handler.removeCallbacks(showMenuFabRunnable)
         handler.removeCallbacks(autoHideMenuFab)
-        if (isInFullscreen()) {
-            binding.menuFab.hide()
-            return
-        }
-        binding.menuFab.hide()
+        if (isInFullscreen() || binding.menuOverlay.isVisible) return
         handler.postDelayed(showMenuFabRunnable, MENU_BUTTON_SHOW_DELAY_MS)
     }
 
     private fun openUriExternally(uri: Uri) {
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != "http" && scheme != "https") {
-            Toast.makeText(this, R.string.error_open_external, Toast.LENGTH_SHORT).show()
-            return
-        }
         runCatching {
-            val intent = Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent)
+            startActivity(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }.onFailure {
             Toast.makeText(this, R.string.error_open_external, Toast.LENGTH_SHORT).show()
         }
@@ -566,84 +524,46 @@ class MainActivity : AppCompatActivity() {
 
     private fun extractBrowsableUrl(intent: Intent?): String? {
         val data = intent?.data ?: return null
-        val scheme = data.scheme?.lowercase() ?: return null
-        return if (scheme == "http" || scheme == "https") data.toString() else null
+        return if (data.scheme?.lowercase() in listOf("http", "https")) data.toString() else null
     }
 
     private fun isInFullscreen(): Boolean = customView != null
 
     private fun enterFullscreen(view: View, callback: WebChromeClient.CustomViewCallback) {
-        if (customView != null) {
-            callback.onCustomViewHidden()
-            return
-        }
-
+        if (customView != null) { callback.onCustomViewHidden(); return }
         (view.parent as? ViewGroup)?.removeView(view)
-
         customView = view
         customViewCallback = callback
-
-        if (binding.menuOverlay.isVisible) {
-            binding.menuOverlay.visibility = View.GONE
-            hideKeyboard(binding.addressEdit)
-        }
-
-        handler.removeCallbacks(showMenuFabRunnable)
-        handler.removeCallbacks(autoHideMenuFab)
+        if (binding.menuOverlay.isVisible) hideMenuOverlay()
         binding.menuFab.hide()
         binding.webView.visibility = View.INVISIBLE
-        binding.progressIndicator.visibility = View.GONE
-
         binding.fullscreenContainer.apply {
             visibility = View.VISIBLE
             removeAllViews()
-            addView(
-                view,
-                FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                )
-            )
+            addView(view, FrameLayout.LayoutParams(-1, -1))
             bringToFront()
         }
-
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        WindowInsetsControllerCompat(window, binding.fullscreenContainer).apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        WindowInsetsControllerCompat(window, binding.fullscreenContainer).hide(WindowInsetsCompat.Type.systemBars())
     }
 
     private fun exitFullscreen(fromWebChrome: Boolean = false) {
         if (customView == null) return
-
-        binding.fullscreenContainer.apply {
-            removeAllViews()
-            visibility = View.GONE
-        }
-
+        binding.fullscreenContainer.apply { removeAllViews(); visibility = View.GONE }
         binding.webView.visibility = View.VISIBLE
-
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowInsetsControllerCompat(window, binding.root).show(WindowInsetsCompat.Type.systemBars())
-
         val callback = customViewCallback
         customView = null
         customViewCallback = null
-
-        if (!fromWebChrome) {
-            callback?.onCustomViewHidden()
-        }
-
+        if (!fromWebChrome) callback?.onCustomViewHidden()
         showMenuButtonTemporarily()
     }
 
     private fun addBookmarkForCurrentPage() {
         val url = currentUrl.trim()
         if (url.isEmpty()) return
-        val added = BrowserPreferences.addBookmark(this, url)
-        if (added) {
+        if (BrowserPreferences.addBookmark(this, url)) {
             Toast.makeText(this, R.string.bookmark_added, Toast.LENGTH_SHORT).show()
             refreshBookmarks()
         } else {
@@ -664,166 +584,64 @@ class MainActivity : AppCompatActivity() {
         container.removeAllViews()
         val bookmarks = BrowserPreferences.getBookmarks(this)
         if (bookmarks.isEmpty()) {
-            val emptyView = MaterialTextView(this).apply {
+            container.addView(MaterialTextView(this).apply {
                 text = getString(R.string.menu_bookmark_empty)
                 setPadding((16 * density).toInt(), (24 * density).toInt(), (16 * density).toInt(), (24 * density).toInt())
                 gravity = android.view.Gravity.CENTER
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
-                setTextColor(getColor(com.google.android.material.R.color.material_on_surface_emphasis_medium))
-            }
-            container.addView(emptyView)
+                setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            })
             return
         }
-
-        bookmarks.forEachIndexed { index, bookmark ->
-            // Create card-like container for each bookmark
+        bookmarks.forEach { bookmark ->
             val itemCard = com.google.android.material.card.MaterialCardView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    if (index > 0) {
-                        topMargin = (8 * density).toInt()
-                    }
-                }
-                radius = (12 * density)
-                cardElevation = 0f
+                radius = 12 * density
+                setCardBackgroundColor(resolveThemeColor(com.google.android.material.R.attr.colorSurfaceContainer))
                 strokeWidth = (1 * density).toInt()
-                strokeColor = com.google.android.material.R.attr.colorOutlineVariant.let { attr ->
-                    val typedValue = android.util.TypedValue()
-                    theme.resolveAttribute(attr, typedValue, true)
-                    typedValue.data
-                }
-                setCardBackgroundColor(com.google.android.material.R.attr.colorSurfaceContainer.let { attr ->
-                    val typedValue = android.util.TypedValue()
-                    theme.resolveAttribute(attr, typedValue, true)
-                    typedValue.data
-                })
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    loadUrlFromIntent(bookmark)
-                    hideBookmarkManager()
-                }
+                strokeColor = resolveThemeColor(com.google.android.material.R.attr.colorOutlineVariant)
+                setOnClickListener { loadUrlFromIntent(bookmark) }
             }
-
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
                 setPadding((12 * density).toInt(), (12 * density).toInt(), (8 * density).toInt(), (12 * density).toInt())
             }
-
-            // Bookmark icon
-            val iconView = android.widget.ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    (40 * density).toInt(),
-                    (40 * density).toInt()
-                )
-                setImageResource(android.R.drawable.star_on)
-                imageTintList = android.content.res.ColorStateList.valueOf(
-                    com.google.android.material.R.attr.colorPrimary.let { attr ->
-                        val typedValue = android.util.TypedValue()
-                        theme.resolveAttribute(attr, typedValue, true)
-                        typedValue.data
-                    }
-                )
-                scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-                setPadding((8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt())
-                background = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(com.google.android.material.R.attr.colorPrimaryContainer.let { attr ->
-                        val typedValue = android.util.TypedValue()
-                        theme.resolveAttribute(attr, typedValue, true)
-                        typedValue.data
-                    })
-                }
-            }
-
-            // Text container
             val textContainer = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply {
-                    marginStart = (12 * density).toInt()
-                    marginEnd = (8 * density).toInt()
-                }
+                layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = (12 * density).toInt() }
             }
-
-            // Extract domain for title display
-            val domain = try {
-                java.net.URI(bookmark).host ?: bookmark
-            } catch (e: Exception) {
-                bookmark
-            }
-
-            val titleView = MaterialTextView(this).apply {
-                text = domain
+            textContainer.addView(MaterialTextView(this).apply {
+                text = try { java.net.URI(bookmark).host ?: bookmark } catch (_: Exception) { bookmark }
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
-            }
-
-            val urlView = MaterialTextView(this).apply {
+            })
+            textContainer.addView(MaterialTextView(this).apply {
                 text = bookmark
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
-                setTextColor(com.google.android.material.R.attr.colorOnSurfaceVariant.let { attr ->
-                    val typedValue = android.util.TypedValue()
-                    theme.resolveAttribute(attr, typedValue, true)
-                    typedValue.data
-                })
-            }
-
-            textContainer.addView(titleView)
-            textContainer.addView(urlView)
-
-            // Delete button as icon button
-            val deleteButton = MaterialButton(
-                ContextThemeWrapper(
-                    this,
-                    com.google.android.material.R.style.Widget_Material3_Button_IconButton_Filled_Tonal
-                )
-            ).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    (40 * density).toInt(),
-                    (40 * density).toInt()
-                )
+                alpha = 0.7f
+            })
+            val delBtn = MaterialButton(ContextThemeWrapper(this, com.google.android.material.R.style.Widget_Material3_Button_IconButton_Filled_Tonal)).apply {
+                layoutParams = LinearLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt())
                 setIconResource(android.R.drawable.ic_menu_delete)
-                iconSize = (20 * density).toInt()
-                iconTint = android.content.res.ColorStateList.valueOf(
-                    android.graphics.Color.WHITE
-                )
-                setBackgroundColor(com.google.android.material.R.attr.colorError.let { attr ->
-                    val typedValue = android.util.TypedValue()
-                    theme.resolveAttribute(attr, typedValue, true)
-                    typedValue.data
-                })
-                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                setIconTint(ColorStateList.valueOf(Color.WHITE))
                 iconPadding = 0
-                contentDescription = getString(R.string.bookmark_delete)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                setBackgroundColor(resolveThemeColor(android.R.attr.colorError))
                 setOnClickListener { removeBookmark(bookmark) }
             }
-
-            row.addView(iconView)
             row.addView(textContainer)
-            row.addView(deleteButton)
+            row.addView(delBtn)
             itemCard.addView(row)
-            container.addView(itemCard)
+            val params = LinearLayout.LayoutParams(-1, -2)
+            params.setMargins(0, (8 * density).toInt(), 0, 0)
+            container.addView(itemCard, params)
         }
     }
 
     private fun showBookmarkManager() {
-        hideKeyboard(binding.addressEdit)
         binding.menuScroll.visibility = View.GONE
-        binding.menuContentRoot.visibility = View.VISIBLE
         binding.bookmarkManagerRoot.visibility = View.VISIBLE
         refreshBookmarks()
     }
@@ -831,116 +649,84 @@ class MainActivity : AppCompatActivity() {
     private fun hideBookmarkManager() {
         binding.bookmarkManagerRoot.visibility = View.GONE
         binding.menuScroll.visibility = View.VISIBLE
-        binding.menuContentRoot.visibility = View.VISIBLE
     }
 
     private fun showQrCodeView() {
         val url = currentUrl.trim()
-        if (url.isEmpty()) {
-            Toast.makeText(this, R.string.qr_code_error, Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        hideKeyboard(binding.addressEdit)
+        if (url.isEmpty()) return
         binding.menuScroll.visibility = View.GONE
-        binding.menuContentRoot.visibility = View.VISIBLE
         binding.qrCodeViewRoot.visibility = View.VISIBLE
-
-        // Generate and display QR code
-        val qrBitmap = generateQrCode(url)
-        if (qrBitmap != null) {
-            binding.qrCodeImage.setImageBitmap(qrBitmap)
+        generateQrCode(url)?.let {
+            binding.qrCodeImage.setImageBitmap(it)
             binding.qrCodeUrl.text = url
-        } else {
-            Toast.makeText(this, R.string.qr_code_error, Toast.LENGTH_SHORT).show()
-            hideQrCodeView()
         }
     }
 
     private fun hideQrCodeView() {
         binding.qrCodeViewRoot.visibility = View.GONE
         binding.menuScroll.visibility = View.VISIBLE
-        binding.menuContentRoot.visibility = View.VISIBLE
+    }
+
+    private fun showSettingsView() {
+        binding.menuScroll.visibility = View.GONE
+        binding.settingsViewRoot.visibility = View.VISIBLE
+        ensureSettingsContentPopulated()
+    }
+
+    private fun ensureSettingsContentPopulated() {
+        if (binding.settingsContentContainer.childCount > 0) return
+        try {
+            val contentView = SettingsViews.createSettingsContent(this, false) {
+                hideSettingsView()
+            }
+            binding.settingsContentContainer.addView(contentView)
+        } catch (_: Exception) {}
+    }
+
+    private fun hideSettingsView() {
+        binding.settingsViewRoot.visibility = View.GONE
+        binding.menuScroll.visibility = View.VISIBLE
     }
 
     private fun showCheckLatestView() {
-        hideKeyboard(binding.addressEdit)
         binding.menuScroll.visibility = View.GONE
-        binding.menuContentRoot.visibility = View.VISIBLE
         binding.checkLatestViewRoot.visibility = View.VISIBLE
-
-        // Set installed version
-        try {
-            val pInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getPackageInfo(
-                    packageName,
-                    android.content.pm.PackageManager.PackageInfoFlags.of(0L)
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getPackageInfo(packageName, 0)
-            }
-            val versionName = pInfo.versionName ?: ""
-            binding.checkLatestInstalledVersion.text = getString(R.string.installed_version_label, "v$versionName")
-        } catch (_: Exception) {
-        }
-
-        // Check for latest version
         binding.checkLatestProgressIndicator.visibility = View.VISIBLE
-        binding.checkLatestLatestVersion.text = getString(R.string.menu_checking_latest)
-
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            binding.checkLatestInstalledVersion.text = getString(R.string.installed_version_label, "v${pInfo.versionName}")
+        } catch (_: Exception) {
+            binding.checkLatestInstalledVersion.text = "Installed: Unknown"
+        }
         Thread {
-            val api = "https://api.github.com/repos/kododake/AABrowser/releases/latest"
-            var latestTag = "unknown"
             try {
-                val conn = java.net.URL(api).openConnection() as java.net.HttpURLConnection
-                conn.requestMethod = "GET"
-                conn.connectTimeout = 5000
-                conn.readTimeout = 5000
+                val conn = java.net.URL("https://api.github.com/repos/kododake/AABrowser/releases/latest").openConnection() as java.net.HttpURLConnection
                 conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
-                val code = conn.responseCode
-                if (code == 200) {
-                    val text = conn.inputStream.bufferedReader().use { it.readText() }
-                    val json = org.json.JSONObject(text)
-                    latestTag = json.optString("tag_name", "unknown")
-                    latestReleaseUrl = json.optString("html_url", latestReleaseUrl)
+                if (conn.responseCode == 200) {
+                    val json = org.json.JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
+                    latestReleaseUrl = json.getString("html_url")
+                    val tag = json.getString("tag_name")
+                    runOnUiThread {
+                        binding.checkLatestProgressIndicator.visibility = View.GONE
+                        binding.checkLatestLatestVersion.text = getString(R.string.latest_version_label, tag)
+                    }
                 }
-            } catch (_: Exception) {
-            }
-
-            runOnUiThread {
-                binding.checkLatestProgressIndicator.visibility = View.GONE
-                binding.checkLatestLatestVersion.text = getString(R.string.latest_version_label, latestTag)
-            }
+            } catch (_: Exception) { runOnUiThread { binding.checkLatestProgressIndicator.visibility = View.GONE } }
         }.start()
     }
 
     private fun hideCheckLatestView() {
         binding.checkLatestViewRoot.visibility = View.GONE
         binding.menuScroll.visibility = View.VISIBLE
-        binding.menuContentRoot.visibility = View.VISIBLE
     }
 
     private fun generateQrCode(content: String): Bitmap? {
         return try {
-            val size = 512 // QR code size in pixels
-            val writer = QRCodeWriter()
-            val bitMatrix: BitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
-
-            val width = bitMatrix.width
-            val height = bitMatrix.height
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-
-            for (x in 0 until width) {
-                for (y in 0 until height) {
-                    bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
-                }
-            }
-
+            val bitMatrix = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 512, 512)
+            val bitmap = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+            for (x in 0 until 512) for (y in 0 until 512) bitmap.setPixel(x, y, if (bitMatrix[x, y]) Color.BLACK else Color.WHITE)
             bitmap
-        } catch (e: Exception) {
-            null
-        }
+        } catch (_: Exception) { null }
     }
 
     companion object {

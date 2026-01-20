@@ -2,4 +2,19 @@
 <resources>
     <item name="webview_original_user_agent_tag" type="id" />
     <item name="webview_allow_once_uri_tag" type="id" />
+    <item name="webview_user_agent_profile_tag" type="id" />
+    <item name="settingsHeaderTitle" type="id" />
+    <item name="buttonSettingsBack" type="id" />
+    <item name="userAgentTitle" type="id" />
+    <item name="userAgentSubtitle" type="id" />
+    <item name="userAgentGroup" type="id" />
+    <item name="userAgentAndroid" type="id" />
+    <item name="userAgentSafari" type="id" />
+    <item name="bitcoinAddress" type="id" />
+    <item name="copyBitcoinButton" type="id" />
+    <item name="ViewKododakeButton" type="id" />
+    <item name="viewLicenseButton" type="id" />
+    <item name="viewOssLicensesButton" type="id" />
+    <item name="buttonQrCopy" type="id" />
+    <item name="buttonQrExternalBrowser" type="id" />
 </resources>

@@ -3,33 +3,59 @@ package com.kododake.aabrowser.data
 import android.content.Context
 import android.net.Uri
 import android.util.Patterns
+import com.kododake.aabrowser.model.UserAgentProfile
 import org.json.JSONArray
 
 object BrowserPreferences {
     private const val PREFS_NAME = "browser_prefs"
     private const val KEY_LAST_URL = "last_url"
     private const val KEY_DESKTOP_MODE = "desktop_mode"
+    private const val KEY_USER_AGENT_PROFILE = "user_agent_profile"
     private const val KEY_BOOKMARKS = "bookmarks"
     private const val KEY_ALLOWED_CLEAR_HOSTS = "allowed_clear_hosts"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
+    fun getUserAgentProfile(context: Context): UserAgentProfile {
+        val key = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_USER_AGENT_PROFILE, null)
+        return UserAgentProfile.fromKey(key)
+    }
+
+    fun setUserAgentProfile(context: Context, profile: UserAgentProfile) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_USER_AGENT_PROFILE, profile.storageKey)
+            .apply()
+    }
+
     fun resolveInitialUrl(context: Context, fallback: String = DEFAULT_URL): String {
         val stored = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LAST_URL, null)
-        return stored?.takeIf { it.isNotBlank() } ?: fallback
+        if (stored.isNullOrBlank()) return fallback
+
+        val uri = runCatching { Uri.parse(stored) }.getOrNull() ?: return fallback
+        val scheme = uri.scheme?.lowercase() ?: return fallback
+        if (scheme == "http") {
+            val host = uri.host?.lowercase() ?: return fallback
+            if (!isHostAllowedCleartext(context, host)) return fallback
+        }
+        return stored
     }
 
     fun persistUrl(context: Context, url: String) {
         val trimmed = url.trim()
         if (trimmed.isEmpty()) return
-        val scheme = runCatching { Uri.parse(trimmed).scheme }.getOrNull()?.lowercase()
+        val uri = runCatching { Uri.parse(trimmed) }.getOrNull() ?: return
+        val scheme = uri.scheme?.lowercase() ?: return
         if (scheme == "about") return
-        val normalized = if (scheme == "http" || scheme == "https") {
-            trimmed
-        } else {
-            formatNavigableUrl(trimmed)
+        if (scheme != "http" && scheme != "https") return
+        if (scheme == "http") {
+            val host = uri.host?.lowercase() ?: return
+            if (!isHostAllowedCleartext(context, host)) return
         }
+
+        val normalized = trimmed
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_LAST_URL, normalized)

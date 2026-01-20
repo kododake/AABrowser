@@ -5,23 +5,31 @@
     <string name="menu_title">AABrowser</string>
     <string name="menu_close">Close</string>
     <string name="menu_address_label">Address or search</string>
+    
     <string name="secure_connection">Secure connection</string>
+    <string name="insecure_connection">Insecure connection</string>
+    
     <string name="menu_desktop_mode">Request desktop site</string>
     <string name="menu_back">Back</string>
     <string name="menu_forward">Forward</string>
     <string name="menu_reload">Reload</string>
     <string name="menu_go">Go</string>
     <string name="menu_clear_address">Clear address</string>
-    <string name="menu_open_external">Open in external browser</string>
+    <string name="open_external_browser">Open External</string>
     <string name="menu_open_github">Open GitHub repository</string>
     <string name="menu_open_description">Open browser menu</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_settings_description">Open settings</string>
+    
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_bookmark_add">Bookmark current page</string>
     <string name="menu_bookmark_empty">No bookmarks yet</string>
+    
     <string name="installed_version_label">Installed Version : %1$s</string>
     <string name="menu_checking_latest">Checking latest release...</string>
     <string name="latest_version_label">Latest: %1$s</string>
     <string name="menu_check_latest">Check for Updates</string>
+    
     <string name="bookmark_added">Saved to bookmarks</string>
     <string name="bookmark_exists">Already in bookmarks</string>
     <string name="bookmark_removed">Bookmark removed</string>
@@ -29,14 +37,49 @@
     <string name="bookmark_manager_title">Bookmarks</string>
     <string name="bookmark_manager_subtitle">Manage your saved pages</string>
     <string name="bookmark_manager_close">Close</string>
+    
     <string name="qr_code_title">Share via QR Code</string>
     <string name="qr_code_subtitle">Scan to open on another device</string>
     <string name="qr_code_back">Back</string>
     <string name="qr_code_error">Unable to generate QR code</string>
+    
     <string name="check_latest_title">Check for Updates</string>
     <string name="check_latest_subtitle">See if a new version is available</string>
     <string name="check_latest_back">Back</string>
     <string name="check_latest_view_release">View Latest Release</string>
+    
+    <string name="settings_title">Settings</string>
+    <string name="settings_user_agent">User agent</string>
+    <string name="settings_user_agent_description">Choose how AABrowser identifies itself when loading pages.</string>
+    <string name="settings_user_agent_android">Android Chrome (default)</string>
+    <string name="settings_user_agent_android_subtitle">Mobile: Android Chrome. Desktop mode uses Windows Chrome UA.</string>
+    <string name="settings_user_agent_safari">Safari (iOS/macOS)</string>
+    <string name="settings_user_agent_safari_subtitle">Use Safari-like identity for Apple-optimized pages.</string>
+    
+    <string name="settings_donate">Donate</string>
+    <string name="settings_donate_description">If you find this app useful, please consider supporting me with a donation. It really fuels my motivation to keep improving it!</string>
+    <string name="donate_bitcoin_address">Bitcoin Address</string>
+    <string name="donate_bitcoin_address_value">bc1qnpqpfq7e8pjtlqj7aa6x2y2c9ctnpts5u9lx7v</string>
+    <string name="donate_copy">Copy</string>
+    <string name="donate_copied">Address copied to clipboard</string>
+
+    <string name="settings_donors">Donors</string>
+    <string name="settings_donors_description">No donations yet! Be the first to support the project and let us know on the Discussions page to see your name featured here.</string>
+    
+    <string name="settings_license">License</string>
+    <string name="settings_license_description">This application and its source code are licensed under the GNU General Public License version 3 (GPLv3). If you incorporate this application or use any of its code, you must include clear attribution to the repository: https://github.com/kododake/AABrowser</string>
+    <string name="license_view_full">View Full License</string>
+    
+    <string name="open_source_title">Open-source libraries</string>
+    <string name="open_source_congratulations">This browser is powered by open source software.</string>
+    <string name="open_source_view_licenses">View open-source licenses</string>
+    <string name="open_source_licenses_title">Open-source Licenses</string>
+    
+    <string name="sponsors_title">Sponsors</string>
+    <string name="sponsors_none_text">This project currently has no sponsors. Donations are welcome — thank you for your support!</string>
+    
+    <string name="kododake_name">kododake (Lead)</string>
+    
     <string name="error_generic_message">An unexpected error occurred.</string>
     <string name="error_open_download">Unable to open download. Please try again on your phone.</string>
     <string name="error_open_external">Unable to open the link externally.</string>
