@@ -63,14 +63,14 @@ To use this app, you must unlock the hidden Developer Settings.
 
 ---
 
-#### ❓ Troubleshooting
+## ❓ Troubleshooting
 
 **App not starting?**
 If the app fails to launch, try opening a non-Google Maps navigation app (such as **Waze**) first, then open AA Browser.
 
 ---
 
-#### ⚠️ Current Issues
+## ⚠️ Current Issues
 
 - 🚫 **No Ad Blocking:** Ad filtering is not currently implemented (contributions welcome!).
 - 🚗 **Stationary Use Only**
