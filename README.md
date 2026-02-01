@@ -16,17 +16,6 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 
 ---
 
-## 🛡️ Privacy, Reimagined
-I care about the app's growth, but I care about your privacy even more. This app is designed with a **Transparency-First** policy:
-
-> [!IMPORTANT]
-> **I have ZERO interest in your browsing habits.**
-> - 🚫 **No URL Tracking:** I don't (and physically can't) see which websites you visit, what you search, or what you type.
-> - 🕵️ **Self-Hosted Analytics:** I use a private **Umami** instance. No IP track, No Google, No Meta, no Big Tech trackers.
-> - 🆔 **Anonymous Data:** I only see **"The app was opened"** and **This App Versions**. I use a random, anonymous UUID that isn't tied to your device ID or personal info.
-
----
-
 ## ✨ Features
 
 - 🎯 **Native Automotive UI:** Designed specifically for car displays, not just a stretched phone app.
@@ -81,7 +70,7 @@ If the app fails to launch, try opening a non-Google Maps navigation app (such a
 
 Every contribution makes AA Browser better!
 
-- 🐛 **Found a bug?** Open an issue with reproduction steps.
+- 🐛 **Found a bug?** Check for existing issues and open a new one with reproduction steps if none are found.
 - 💡 **Got an idea?** Start a discussion.
 - 🔧 **Wanna code?** Fork the repo and submit a PR!
 - 📸 **Show it off:** Share a photo of AA Browser on your dashboard in the Discussions tab!
@@ -101,6 +90,17 @@ Every contribution makes AA Browser better!
 
 - **[jdrch](https://github.com/jdrch):** For suggesting **Obtainium**—a brilliant idea for seamless updates!
 - **[Obtainium](https://github.com/ImranR98/Obtainium):** For being an amazing bridge between devs and users.
+
+---
+
+## 🛡️ Privacy, Reimagined
+I care about the app's growth, but I care about your privacy even more. This app is designed with a **Transparency-First** policy:
+
+> [!IMPORTANT]
+> **I have ZERO interest in your browsing habits.**
+> - 🚫 **No URL Tracking:** I don't (and physically can't) see which websites you visit, what you search, or what you type.
+> - 🕵️ **Self-Hosted Analytics:** I use a private **Umami** instance. No IP track, No Google, No Meta, no Big Tech trackers.
+> - 🆔 **Anonymous Data:** I only see **"The app was opened"** and **This App Versions**. I use a random, anonymous UUID that isn't tied to your device ID or personal info.
 
 ---
 

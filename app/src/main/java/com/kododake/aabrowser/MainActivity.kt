@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private var webView: android.webkit.WebView? = null
     private var currentUrl: String = BrowserPreferences.defaultUrl()
     private var currentUserAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
+    private var browserCallbacks: BrowserCallbacks? = null
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var isShowingCleartextDialog: Boolean = false
@@ -79,19 +80,12 @@ class MainActivity : AppCompatActivity() {
 
         umamiTracker.trackEvent("app_open")
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            val disp = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                this.display
-            } else {
-                val dm = getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
-                dm?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
-            }
-            val best = disp?.supportedModes?.maxWithOrNull(compareBy({ it.refreshRate }, { it.physicalWidth.toLong() * it.physicalHeight }))
-            best?.let { mode ->
-                val attrs = window.attributes
-                attrs.preferredDisplayModeId = mode.modeId
-                window.attributes = attrs
-            }
+        val disp = this.display
+        val best = disp?.supportedModes?.maxWithOrNull(compareBy({ it.refreshRate }, { it.physicalWidth.toLong() * it.physicalHeight }))
+        best?.let { mode ->
+            val attrs = window.attributes
+            attrs.preferredDisplayModeId = mode.modeId
+            window.attributes = attrs
         }
 
         setupUi()
@@ -141,7 +135,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.menuFab.hide()
 
-        val callbacks = BrowserCallbacks(
+        browserCallbacks = BrowserCallbacks(
             onUrlChange = { url ->
                 runOnUiThread {
                     currentUrl = url
@@ -225,7 +219,8 @@ class MainActivity : AppCompatActivity() {
 
         webView = binding.webView
         webView?.let { view ->
-            configureWebView(view, callbacks, desktopMode, currentUserAgentProfile)
+            configureWebView(view, browserCallbacks ?: BrowserCallbacks(), desktopMode, currentUserAgentProfile)
+            
             view.addJavascriptInterface(object {
                 @android.webkit.JavascriptInterface
                 fun openExternal(url: String) {
@@ -233,6 +228,7 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread { runCatching { openUriExternally(Uri.parse(url)) } }
                 }
             }, "Android")
+
             view.setOnTouchListener { _, _ ->
                 showMenuButtonTemporarily()
                 false
@@ -428,6 +424,29 @@ class MainActivity : AppCompatActivity() {
     private fun navigateToAddress() {
         val raw = binding.addressEdit.text?.toString().orEmpty()
         val navigable = BrowserPreferences.formatNavigableUrl(raw)
+        if (navigable.isEmpty()) return
+        val uri = runCatching { Uri.parse(navigable) }.getOrNull() ?: return
+        if (uri.scheme?.lowercase() == "http") {
+            val host = uri.host?.lowercase()
+            if (!BrowserPreferences.isHostAllowedCleartext(this, host)) {
+                val allowOnce = {
+                    webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
+                    webView?.post { webView?.loadUrl(navigable) }
+                    kotlin.Unit
+                }
+                val allowHost = {
+                    host?.let { BrowserPreferences.addAllowedCleartextHost(this, it) }
+                    webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
+                    webView?.post { webView?.loadUrl(navigable) }
+                    kotlin.Unit
+                }
+                val cancel = { kotlin.Unit }
+                browserCallbacks?.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
+                hideMenuOverlay()
+                return
+            }
+        }
+
         currentUrl = navigable
         BrowserPreferences.persistUrl(this, navigable)
         webView?.loadUrl(navigable)
@@ -437,6 +456,32 @@ class MainActivity : AppCompatActivity() {
     private fun loadUrlFromIntent(rawUrl: String) {
         val navigable = BrowserPreferences.formatNavigableUrl(rawUrl.trim())
         if (navigable.isEmpty()) return
+        val uri = runCatching { Uri.parse(navigable) }.getOrNull() ?: return
+        if (uri.scheme?.lowercase() == "http") {
+            val host = uri.host?.lowercase()
+            if (!BrowserPreferences.isHostAllowedCleartext(this, host)) {
+                val allowOnce = {
+                    webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
+                    webView?.post { webView?.loadUrl(navigable) }
+                    kotlin.Unit
+                }
+                val allowHost = {
+                    host?.let { BrowserPreferences.addAllowedCleartextHost(this, it) }
+                    webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
+                    webView?.post { webView?.loadUrl(navigable) }
+                    kotlin.Unit
+                }
+                val cancel = {
+                    webView?.stopLoading()
+                    kotlin.Unit
+                }
+                browserCallbacks?.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
+                binding.addressEdit.setText(navigable)
+                hideMenuOverlay()
+                return
+            }
+        }
+
         currentUrl = navigable
         BrowserPreferences.persistUrl(this, navigable)
         binding.addressEdit.setText(navigable)

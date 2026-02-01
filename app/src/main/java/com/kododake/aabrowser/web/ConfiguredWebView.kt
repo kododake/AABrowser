@@ -1,22 +1,21 @@
 package com.kododake.aabrowser.web
 
-import android.content.ActivityNotFoundException
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
-import android.os.Message
+import android.net.http.SslError
 import android.os.Build
+import android.os.Message
 import android.view.View
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.PermissionRequest
+import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.net.http.SslError
-import android.webkit.SslErrorHandler
 import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.net.toUri
@@ -46,7 +45,8 @@ fun configureWebView(
     userAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
 ) {
     with(webView) {
-        setBackgroundColor(Color.BLACK)
+        setBackgroundColor(Color.TRANSPARENT)
+
         isHorizontalScrollBarEnabled = false
         isVerticalScrollBarEnabled = true
 
@@ -54,21 +54,23 @@ fun configureWebView(
 
         val originalUserAgent = settings.userAgentString
         setTag(R.id.webview_original_user_agent_tag, originalUserAgent)
+
         settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = true
+
             setSupportMultipleWindows(true)
+
             setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
-            loadWithOverviewMode = useDesktopMode
-            useWideViewPort = useDesktopMode
             cacheMode = WebSettings.LOAD_DEFAULT
             allowContentAccess = true
             allowFileAccess = false
-            mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 safeBrowsingEnabled = true
             }
@@ -76,6 +78,7 @@ fun configureWebView(
                 offscreenPreRaster = true
             }
         }
+
         applyUserAgent(userAgentProfile, useDesktopMode)
         val scale = context.resources.displayMetrics.density * 100
         setInitialScale(scale.toInt())
@@ -85,32 +88,12 @@ fun configureWebView(
             it.setAcceptThirdPartyCookies(this, true)
         }
 
-        setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        //setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
-                val scheme = uri.scheme?.lowercase()
-                if (scheme == "http") {
-                    val host = uri.host?.lowercase()
-                    if (!com.kododake.aabrowser.data.BrowserPreferences.isHostAllowedCleartext(view.context, host)) {
-                        val allowOnce = {
-                            view.post { view.loadUrl(uri.toString()) }
-                            kotlin.Unit
-                        }
-                        val allowHost = {
-                            view.context?.let { ctx ->
-                                val hostToStore = uri.host?.lowercase()
-                                if (hostToStore != null) com.kododake.aabrowser.data.BrowserPreferences.addAllowedCleartextHost(ctx, hostToStore)
-                            }
-                            view.post { view.loadUrl(uri.toString()) }
-                            kotlin.Unit
-                        }
-                        val cancel = { kotlin.Unit }
-                        callbacks.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
-                        return true
-                    }
-                }
+                if (handleCleartextIfNeeded(view, uri, callbacks, onPageStart = false)) return true
                 return handleUri(view, uri)
             }
 
@@ -120,7 +103,6 @@ fun configureWebView(
                 if (scheme == null || scheme in setOf("http", "https", "about", "file", "data", "javascript")) {
                     return false
                 }
-
                 return true
             }
 
@@ -129,32 +111,15 @@ fun configureWebView(
                 val stringUrl = url ?: return
                 val uri = Uri.parse(stringUrl)
                 val scheme = uri.scheme?.lowercase()
+
                 if (scheme == "http") {
-                    val host = uri.host?.lowercase()
                     val allowedOnce = getTag(R.id.webview_allow_once_uri_tag) as? String
                     if (allowedOnce == stringUrl) {
                         setTag(R.id.webview_allow_once_uri_tag, null)
-                    } else if (!com.kododake.aabrowser.data.BrowserPreferences.isHostAllowedCleartext(view.context, host)) {
-                        stopLoading()
-                        val allowOnce = {
-                            setTag(R.id.webview_allow_once_uri_tag, stringUrl)
-                            view.post { view.loadUrl(stringUrl) }
-                            kotlin.Unit
-                        }
-                        val allowHost = {
-                            view.context?.let { ctx ->
-                                val hostToStore = uri.host?.lowercase()
-                                if (hostToStore != null) com.kododake.aabrowser.data.BrowserPreferences.addAllowedCleartextHost(ctx, hostToStore)
-                            }
-                            view.post { view.loadUrl(stringUrl) }
-                            kotlin.Unit
-                        }
-                        val cancel = { kotlin.Unit }
-                        callbacks.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
+                    } else if (handleCleartextIfNeeded(view, uri, callbacks, onPageStart = true)) {
                         return
                     }
                 }
-                url.let(callbacks.onUrlChange)
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
@@ -190,7 +155,6 @@ fun configureWebView(
                         return
                     }
                 }
-
                 callbacks.onError(error.errorCode, error.description?.toString())
             }
 
@@ -202,10 +166,7 @@ fun configureWebView(
                 if (request.isForMainFrame) {
                     val status = try { errorResponse.statusCode } catch (_: Exception) { -1 }
                     val reason = errorResponse.reasonPhrase ?: ""
-
-                    if (status == 429) {
-                        return
-                    }
+                    if (status == 429) return
 
                     val failed = request.url?.toString().orEmpty()
                     val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&httpStatus=$status&code=$status&message=${Uri.encode(reason)}"
@@ -213,7 +174,7 @@ fun configureWebView(
                         view.loadUrl(assetUrl)
                         return
                     } catch (_: Exception) {}
-                    
+
                     callbacks.onError(status, reason)
                     return
                 }
@@ -229,7 +190,7 @@ fun configureWebView(
                     handler.cancel()
                     return
                 } catch (_: Exception) {}
-                
+
                 handler.cancel()
                 callbacks.onError(primary, message)
             }
@@ -258,15 +219,11 @@ fun configureWebView(
             }
 
             override fun onPermissionRequest(request: PermissionRequest?) {
-                if (request == null) {
-                    super.onPermissionRequest(null)
-                    return
-                }
+                if (request == null) return
 
                 val grantable = request.resources.filter { resource ->
                     resource == PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID
-                }
-                    .toTypedArray()
+                }.toTypedArray()
 
                 if (grantable.isEmpty()) {
                     request.deny()
@@ -291,6 +248,42 @@ fun configureWebView(
             callbacks.onShowDownloadPrompt(uri)
         })
     }
+}
+
+private fun handleCleartextIfNeeded(view: WebView, uri: Uri?, callbacks: BrowserCallbacks, onPageStart: Boolean = false): Boolean {
+    uri ?: return false
+    val scheme = uri.scheme?.lowercase() ?: return false
+    if (scheme != "http") return false
+
+    val allowedOnce = view.getTag(R.id.webview_allow_once_uri_tag) as? String
+    if (allowedOnce == uri.toString()) {
+        view.setTag(R.id.webview_allow_once_uri_tag, null)
+        return false
+    }
+
+    val host = uri.host?.lowercase()
+    if (com.kododake.aabrowser.data.BrowserPreferences.isHostAllowedCleartext(view.context, host)) return false
+    if (onPageStart) view.stopLoading()
+    val allowOnce = {
+        view.setTag(R.id.webview_allow_once_uri_tag, uri.toString())
+        view.post { view.loadUrl(uri.toString()) }
+        kotlin.Unit
+    }
+    val allowHost = {
+        view.context?.let { ctx ->
+            val hostToStore = uri.host?.lowercase()
+            if (hostToStore != null) com.kododake.aabrowser.data.BrowserPreferences.addAllowedCleartextHost(ctx, hostToStore)
+        }
+        view.setTag(R.id.webview_allow_once_uri_tag, uri.toString())
+        view.post { view.loadUrl(uri.toString()) }
+        kotlin.Unit
+    }
+    val cancel = {
+        if (onPageStart) view.stopLoading()
+        kotlin.Unit
+    }
+    callbacks.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
+    return true
 }
 
 fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
@@ -324,7 +317,7 @@ private fun buildUserAgent(profile: UserAgentProfile, desktop: Boolean): String 
     }
 }
 
-private const val CHROME_VERSION = "143.0.0.0"
+private const val CHROME_VERSION = "144.0.0.0"
 private const val MOBILE_CHROME_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Mobile Safari/537.36"
 private const val WINDOWS_CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Safari/537.36"
 private const val SAFARI_MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
