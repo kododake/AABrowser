@@ -19,7 +19,7 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 ## ✨ Features
 
 - 🎯 **Native Automotive UI:** Designed specifically for car displays, not just a stretched phone app.
-- 🎬 **Immersive Media:** Enjoy fullscreen video with DRM support—perfect for charging breaks or waiting in a "flat, boring desert world."
+- 🎬 **Immersive Media:** Watch fullscreen DRM-protected video (supports Widevine L3 only due to technical limitations) — perfect for charging breaks or while parked in a "flat, boring desert world."
 - 🎨 **Material 3 Design:** Sleek interface with large, driver-friendly touch targets.
 - 🔄 **Smart Desktop Mode:** Seamlessly toggle between mobile and desktop rendering.
 - 📚 **Dashboard Bookmarks:** Quick access to your favorite sites without touching your phone.
