@@ -113,5 +113,8 @@ If AA Browser makes your "car life" better, please consider a donation! As a stu
 
 *If you donate, please let me know in the Discussions! I'd love to add you to our contributor list as a token of my gratitude.*
 
+> [!CAUTION]
+> **No Exchange Transfers for Contributor Listing** > I **cannot** verify or list donations sent directly from cryptocurrency exchanges (e.g., Binance, Coinbase, etc.) because they do not support message signing. To be listed, please send from a wallet where you control the private keys.
+
 ---
 **Stay safe, keep your eyes on the road, and happy browsing! 🚗💨**
