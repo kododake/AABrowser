@@ -162,8 +162,22 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     webView?.evaluateJavascript("""
                         (function(){
+                            function clickControl(re) {
+                                var controls = document.querySelectorAll('button, [role="button"], [aria-label], [title], [data-tooltip]');
+                                for (var i = 0; i < controls.length; i++) {
+                                    var el = controls[i];
+                                    if (!el) continue;
+                                    var label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('data-tooltip') || el.textContent || '').toLowerCase();
+                                    if (re.test(label)) {
+                                        el.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                            if (clickControl(/next|next track|skip|次|次へ|スキップ/)) return;
                             var medias = document.querySelectorAll('video, audio');
-                            for(var i=0; i<medias.length; i++) medias[i].currentTime += 10;
+                            for (var i = 0; i < medias.length; i++) medias[i].currentTime += 10;
                         })();
                     """.trimIndent(), null)
                 }
@@ -172,8 +186,22 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     webView?.evaluateJavascript("""
                         (function(){
+                            function clickControl(re) {
+                                var controls = document.querySelectorAll('button, [role="button"], [aria-label], [title], [data-tooltip]');
+                                for (var i = 0; i < controls.length; i++) {
+                                    var el = controls[i];
+                                    if (!el) continue;
+                                    var label = (el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('data-tooltip') || el.textContent || '').toLowerCase();
+                                    if (re.test(label)) {
+                                        el.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                            if (clickControl(/previous|prev|back|前|前へ|戻る/)) return;
                             var medias = document.querySelectorAll('video, audio');
-                            for(var i=0; i<medias.length; i++) medias[i].currentTime -= 10;
+                            for (var i = 0; i < medias.length; i++) medias[i].currentTime -= 10;
                         })();
                     """.trimIndent(), null)
                 }

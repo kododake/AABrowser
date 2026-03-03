@@ -13,7 +13,6 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import androidx.media3.session.SessionResult
 import com.kododake.aabrowser.MainActivity
 import com.kododake.aabrowser.R
 
@@ -36,35 +35,14 @@ class WebMediaSessionService : MediaSessionService() {
                 .add(Player.COMMAND_STOP)
                 .add(Player.COMMAND_SEEK_TO_NEXT)
                 .add(Player.COMMAND_SEEK_TO_PREVIOUS)
-                .add(Player.COMMAND_SEEK_FORWARD)
-                .add(Player.COMMAND_SEEK_BACK)
+                .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
                 .setAvailablePlayerCommands(playerCommands)
                 .build()
-        }
-
-        @Suppress("DEPRECATION")
-        override fun onPlayerCommandRequest(
-            session: MediaSession,
-            controller: MediaSession.ControllerInfo,
-            playerCommand: Int,
-        ): Int {
-            when (playerCommand) {
-                Player.COMMAND_PLAY_PAUSE -> {
-                    val shouldPlay = !player.isPlaying
-                    broadcastWebCommand(if (shouldPlay) COMMAND_PLAY else COMMAND_PAUSE)
-                }
-                Player.COMMAND_STOP -> broadcastWebCommand(COMMAND_PAUSE)
-                Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> {
-                    broadcastWebCommand(COMMAND_SKIP_BACKWARD)
-                }
-                Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_FORWARD, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> {
-                    broadcastWebCommand(COMMAND_SKIP_FORWARD)
-                }
-            }
-            return SessionResult.RESULT_SUCCESS
         }
     }
 
@@ -118,12 +96,67 @@ class WebMediaSessionService : MediaSessionService() {
                 return super.getAvailableCommands().buildUpon()
                     .add(Player.COMMAND_SEEK_TO_NEXT)
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS)
-                    .add(Player.COMMAND_SEEK_FORWARD)
-                    .add(Player.COMMAND_SEEK_BACK)
+                    .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
                     .add(Player.COMMAND_PLAY_PAUSE)
                     .add(Player.COMMAND_STOP)
                     .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
                     .build()
+            }
+
+            override fun isCommandAvailable(command: Int): Boolean {
+                return when (command) {
+                    Player.COMMAND_SEEK_TO_NEXT,
+                    Player.COMMAND_SEEK_TO_PREVIOUS,
+                    Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                    Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+                    else -> super.isCommandAvailable(command)
+                }
+            }
+
+            // Trick: Force hasNext/Previous to true so the buttons are active
+            override fun hasNextMediaItem(): Boolean = true
+            override fun hasPreviousMediaItem(): Boolean = true
+
+            override fun play() {
+                broadcastWebCommand(COMMAND_PLAY)
+                super.play()
+            }
+
+            override fun pause() {
+                broadcastWebCommand(COMMAND_PAUSE)
+                super.pause()
+            }
+
+            override fun stop() {
+                broadcastWebCommand(COMMAND_PAUSE)
+                super.stop()
+            }
+
+            override fun seekToNext() {
+                broadcastWebCommand(COMMAND_SKIP_FORWARD)
+            }
+
+            override fun seekToPrevious() {
+                broadcastWebCommand(COMMAND_SKIP_BACKWARD)
+            }
+
+            override fun seekToNextMediaItem() {
+                broadcastWebCommand(COMMAND_SKIP_FORWARD)
+            }
+
+            override fun seekToPreviousMediaItem() {
+                broadcastWebCommand(COMMAND_SKIP_BACKWARD)
+            }
+
+            override fun seekForward() {
+                val targetPositionMs = (currentPosition + SEEK_INCREMENT_MS).coerceAtLeast(0L)
+                broadcastWebCommand(COMMAND_SEEK, targetPositionMs)
+            }
+
+            override fun seekBack() {
+                val targetPositionMs = (currentPosition - SEEK_INCREMENT_MS).coerceAtLeast(0L)
+                broadcastWebCommand(COMMAND_SEEK, targetPositionMs)
             }
 
             override fun getMediaMetadata(): MediaMetadata {
@@ -278,6 +311,7 @@ class WebMediaSessionService : MediaSessionService() {
         const val COMMAND_SKIP_FORWARD = 3
         const val COMMAND_SKIP_BACKWARD = 4
         const val COMMAND_SEEK = 5
+        private const val SEEK_INCREMENT_MS = 10_000L
 
         private const val SILENCE_DURATION_US = 24L * 60L * 60L * 1_000_000L
     }

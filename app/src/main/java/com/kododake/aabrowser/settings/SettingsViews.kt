@@ -318,7 +318,8 @@ object SettingsViews {
 
         container.findViewById<View>(R.id.viewOssLicensesButton)?.setOnClickListener {
             try {
-                val intent = Intent(context, com.google.android.gms.oss.licenses.OssLicensesMenuActivity::class.java)
+                val activityClass = Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")
+                val intent = Intent(context, activityClass)
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
             } catch (e: Exception) {
