@@ -84,7 +84,7 @@ object BrowserPreferences {
     fun getBookmarks(context: Context): List<String> {
         val bookmarks = loadBookmarks(context)
         if (bookmarks.isEmpty()) {
-            val defaults = listOf("https://www.google.com", "https://www.youtube.com")
+            val defaults = listOf("https://www.google.com", "https://www.youtube.com", "https://nonnontv.com/", "https://keepandroidopen.org/")
             persistBookmarks(context, defaults)
             return defaults
         }
@@ -157,8 +157,6 @@ object BrowserPreferences {
         list.forEach { out.put(it) }
         prefs.edit().putString(KEY_ALLOWED_CLEAR_HOSTS, out.toString()).apply()
     }
-
-    
 
     private fun loadBookmarks(context: Context): List<String> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

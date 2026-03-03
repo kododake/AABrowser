@@ -1,6 +1,7 @@
 package com.kododake.aabrowser
 
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.content.pm.ApplicationInfo
@@ -27,6 +28,7 @@ import com.kododake.aabrowser.analytics.UmamiTracker
 import com.google.android.material.color.DynamicColors
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
@@ -45,6 +47,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.common.BitMatrix
 import android.widget.RadioGroup
 import com.kododake.aabrowser.settings.SettingsViews
+import org.woheller69.freeDroidWarn.R as FreeDroidWarnR
 
 class MainActivity : AppCompatActivity() {
 
@@ -90,6 +93,7 @@ class MainActivity : AppCompatActivity() {
 
         setupUi()
         setupBackPressHandling()
+        showFreeDroidWarnOnUpgradeMaterial()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -124,6 +128,46 @@ class MainActivity : AppCompatActivity() {
         val typedValue = TypedValue()
         theme.resolveAttribute(attrRes, typedValue, true)
         return typedValue.data
+    }
+
+    private fun showFreeDroidWarnOnUpgradeMaterial() {
+        if (isFinishing || isDestroyed) return
+
+        val appVersionCode = runCatching {
+            packageManager.getPackageInfo(packageName, 0).longVersionCode.toInt()
+        }.getOrDefault(1)
+
+        val prefManager = getSharedPreferences("${packageName}_preferences", Context.MODE_PRIVATE)
+        val warnedVersionCode = prefManager.getInt(FREE_DROID_WARN_VERSION_KEY, 0)
+        if (appVersionCode <= warnedVersionCode) return
+
+        val view = layoutInflater.inflate(R.layout.dialog_free_droid_warn, null)
+        val titleView = view.findViewById<android.widget.TextView>(R.id.free_droid_warn_title)
+        val messageView = view.findViewById<android.widget.TextView>(R.id.free_droid_warn_message)
+        titleView.text = getString(android.R.string.dialog_alert_title)
+        messageView.text = getString(FreeDroidWarnR.string.dialog_Warning)
+
+        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(
+            this,
+            com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog
+        )
+            .setView(view)
+            .setNegativeButton(FreeDroidWarnR.string.dialog_more_info) { _, _ ->
+                loadUrlFromIntent(KEEP_ANDROID_OPEN_URL)
+            }
+            .setNeutralButton(FreeDroidWarnR.string.solution) { _, _ ->
+                loadUrlFromIntent(FREE_DROID_WARN_SOLUTIONS_URL)
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                prefManager.edit().putInt(FREE_DROID_WARN_VERSION_KEY, appVersionCode).apply()
+            }
+            .create()
+
+        dialog.setCanceledOnTouchOutside(false)
+        dialog.show()
+        dialog.getButton(DialogInterface.BUTTON_NEUTRAL)?.setTextColor(
+            ContextCompat.getColor(this, android.R.color.holo_red_dark)
+        )
     }
 
     private fun setupUi() {
@@ -778,5 +822,8 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_BUTTON_AUTO_HIDE_DELAY_MS = 3000L
         private const val MENU_BUTTON_SHOW_DELAY_MS = 500L
         private const val GITHUB_REPO_URL = "https://github.com/kododake/AABrowser"
+        private const val KEEP_ANDROID_OPEN_URL = "https://keepandroidopen.org"
+        private const val FREE_DROID_WARN_SOLUTIONS_URL = "https://github.com/woheller69/FreeDroidWarn?tab=readme-ov-file#solutions"
+        private const val FREE_DROID_WARN_VERSION_KEY = "versionCodeWarn"
     }
 }

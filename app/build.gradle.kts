@@ -17,8 +17,8 @@ android {
         applicationId = "com.kododake.aabrowser"
         minSdk = 35
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.3"
+        versionCode = 4
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -112,6 +112,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.google.oss.licenses)
+    implementation("com.github.woheller69:FreeDroidWarn:V1.+")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
