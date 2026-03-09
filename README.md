@@ -76,25 +76,28 @@ Every contribution makes AA Browser better!
 - 🔧 **Wanna code?** Fork the repo and submit a PR!
 - 📸 **Show it off:** Share a photo of AA Browser on your dashboard in the Discussions tab!
 
-<table width="80%">
+<table width="100%">
   <tr>
-    <td align="center" valign="top" width="50%">
+    <td align="center" valign="top" width="33%">
       <a href="https://github.com/kododake">
-        <img src="https://github.com/kododake.png?s=100" width="80" alt="kododake"/><br />
-        <sub>kododake</sub>
-      </a>
+        <img src="https://github.com/kododake.png?s=100" width="60" alt="kododake"/><br />
+        <sub><b>kododake</b></sub>
+      </a><br />
+      <sub>Project Lead</sub>
     </td>
-    <td align="center" valign="top" width="50%">
+    <td align="center" valign="top" width="33%">
       <a href="https://github.com/cmacrowther">
-        <img src="https://github.com/cmacrowther.png?s=100" width="80" alt="Colin Crowther"/><br />
-        <sub>Colin Crowther</sub>
-      </a>
+        <img src="https://github.com/cmacrowther.png?s=100" width="60" alt="Colin Crowther"/><br />
+        <sub><b>Colin Crowther</b></sub>
+      </a><br />
+      <sub>Design Improvements</sub>
     </td>
-    <td align="center" valign="top" width="50%">
+    <td align="center" valign="top" width="33%">
       <a href="https://github.com/jigneshbhavani">
-        <img src="https://github.com/jigneshbhavani.png?s=100" width="80" alt="jigneshbhavani"/><br />
-        <sub>jigneshbhavani</sub>
-      </a>
+        <img src="https://github.com/jigneshbhavani.png?s=100" width="60" alt="jigneshbhavani"/><br />
+        <sub><b>jigneshbhavani</b></sub>
+      </a><br />
+      <sub>Microphone Support</sub>
     </td>
   </tr>
 </table>
