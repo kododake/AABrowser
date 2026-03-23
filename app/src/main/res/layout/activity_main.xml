@@ -26,12 +26,241 @@
             android:overScrollMode="never" />
 
         <FrameLayout
+            android:id="@+id/startPageRoot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/start_page_gradient">
+
+            <ImageView
+                android:id="@+id/startPageBackgroundImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:contentDescription="@null" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#8C04111A" />
+
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/startPageScroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true"
+                android:clipToPadding="false"
+                android:padding="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal">
+
+                    <TextView
+                        android:id="@+id/startPageHeadline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/start_page_headline"
+                        android:textAppearance="@style/TextAppearance.Material3.DisplaySmall"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/startPageSubtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center"
+                        android:text="@string/start_page_subtitle"
+                        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                        android:textColor="#E6FFFFFF" />
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/startPageCard"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="24dp"
+                        app:cardCornerRadius="24dp"
+                        app:cardElevation="0dp"
+                        app:cardBackgroundColor="#CCFFFFFF">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="20dp">
+
+                            <TextView
+                                android:id="@+id/startPageCardTitle"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/start_page_card_title"
+                                android:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                                android:textStyle="bold"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/startPageCardSubtitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/start_page_card_subtitle"
+                                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+
+                            <LinearLayout
+                                android:id="@+id/startPageQuickLinksContainer"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="16dp"
+                                android:orientation="vertical" />
+
+                            <TextView
+                                android:id="@+id/startPageQuickLinksHint"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="16dp"
+                                android:gravity="center"
+                                android:text="@string/start_page_quick_links_hint"
+                                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonStartPageBookmarks"
+                            style="?attr/materialButtonTonalStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="8dp"
+                            android:text="@string/start_page_open_bookmarks"
+                            app:icon="@drawable/kid_star_24px" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/buttonStartPageResume"
+                            style="?attr/materialButtonTonalStyle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="8dp"
+                            android:text="@string/start_page_resume_last_page"
+                            android:visibility="gone"
+                            app:icon="@drawable/refresh_24px" />
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.core.widget.NestedScrollView>
+        </FrameLayout>
+
+        <FrameLayout
             android:id="@+id/fullscreenContainer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:visibility="gone" />
 
     </FrameLayout>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/persistentAddressBarCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/address_bar_background"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="2dp"
+        app:strokeColor="?attr/colorOutlineVariant"
+        app:strokeWidth="1dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="4dp">
+
+            <ImageView
+                android:id="@+id/persistentAddressSecureIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="@string/secure_connection"
+                android:src="@drawable/lock_24"
+                app:tint="?attr/colorOnSurfaceVariant" />
+
+            <ImageView
+                android:id="@+id/persistentAddressInsecureIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="@string/insecure_connection"
+                android:src="@drawable/lock_open_right_24"
+                app:tint="?attr/colorError" />
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/persistentAddressEdit"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="8dp"
+                android:background="@android:color/transparent"
+                android:hint="@string/menu_address_label"
+                android:imeOptions="actionGo"
+                android:inputType="textUri"
+                android:singleLine="true"
+                android:textColor="?attr/colorOnSurface"
+                android:textColorHint="?attr/colorOnSurfaceVariant"
+                android:textSize="15sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/persistentButtonClearAddress"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/menu_clear_address"
+                android:visibility="gone"
+                app:icon="@drawable/ic_close"
+                app:iconSize="20dp"
+                app:iconTint="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/persistentButtonGo"
+                style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/menu_go"
+                app:icon="@drawable/search_24px"
+                app:iconSize="20dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/persistentButtonMenu"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/menu_open_description"
+                app:icon="@android:drawable/ic_menu_more"
+                app:iconSize="20dp"
+                app:iconTint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <FrameLayout
         android:id="@+id/menuOverlay"
@@ -245,7 +474,7 @@
                                     android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
                                     android:columnCount="3"
-                                    android:rowCount="2"
+                                    android:rowCount="3"
                                     android:padding="12dp"
                                     android:alignmentMode="alignBounds"
                                     android:columnOrderPreserved="false">
@@ -345,6 +574,23 @@
                                         app:iconGravity="top"
                                         app:iconSize="@dimen/icon_size_small"
                                         app:iconPadding="4dp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonStartPage"
+                                        style="@style/Widget.Material3.Button.TonalButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_columnWeight="1"
+                                        android:layout_row="2"
+                                        android:layout_column="0"
+                                        android:layout_columnSpan="3"
+                                        android:layout_margin="4dp"
+                                        android:text="@string/menu_start_page"
+                                        android:textSize="13sp"
+                                        app:icon="@drawable/kid_star_24px"
+                                        app:iconGravity="start"
+                                        app:iconSize="@dimen/icon_size_small"
+                                        app:iconPadding="8dp" />
                                 </GridLayout>
                             </com.google.android.material.card.MaterialCardView>
 
@@ -549,6 +795,40 @@
                                 app:strokeWidth="1.5dp"
                                 app:strokeColor="?attr/colorPrimary"
                                 app:icon="@drawable/ic_bookmark_add"
+                                app:iconGravity="textStart"
+                                app:iconSize="24dp"
+                                app:iconPadding="12dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/buttonBookmarkStartPageAdd"
+                                style="@style/Widget.Material3.Button.TonalButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:paddingVertical="14dp"
+                                android:text="@string/menu_start_page_add_current"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                                app:cornerRadius="@dimen/card_corner_radius"
+                                app:strokeWidth="1.5dp"
+                                app:strokeColor="?attr/colorPrimary"
+                                app:icon="@drawable/kid_star_24px"
+                                app:iconGravity="textStart"
+                                app:iconSize="24dp"
+                                app:iconPadding="12dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/buttonBookmarkSetHomePage"
+                                style="@style/Widget.Material3.Button.TonalButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="12dp"
+                                android:paddingVertical="14dp"
+                                android:text="@string/menu_home_page_set_current"
+                                android:textAppearance="@style/TextAppearance.Material3.LabelLarge"
+                                app:cornerRadius="@dimen/card_corner_radius"
+                                app:strokeWidth="1.5dp"
+                                app:strokeColor="?attr/colorPrimary"
+                                app:icon="@drawable/home_24px"
                                 app:iconGravity="textStart"
                                 app:iconSize="24dp"
                                 app:iconPadding="12dp" />

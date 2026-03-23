@@ -9,7 +9,9 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -25,27 +27,35 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.webkit.WebChromeClient
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.Toast
 import com.kododake.aabrowser.analytics.UmamiTracker
-import com.google.android.material.color.DynamicColors
 import androidx.activity.addCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.data.BrowserPreferences
+import com.kododake.aabrowser.data.SiteIconCache
 import com.kododake.aabrowser.databinding.ActivityMainBinding
+import com.kododake.aabrowser.model.QuickActionButtonMode
+import com.kododake.aabrowser.model.QuickActionButtonPosition
 import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.web.BrowserCallbacks
 import com.kododake.aabrowser.web.configureWebView
 import com.kododake.aabrowser.web.releaseCompletely
 import com.kododake.aabrowser.web.updateDesktopMode
+import com.kododake.aabrowser.web.updatePageDarkening
 import com.kododake.aabrowser.web.updateUserAgentProfile
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textview.MaterialTextView
@@ -64,17 +74,25 @@ class MainActivity : AppCompatActivity() {
     }
     private val handler = Handler(Looper.getMainLooper())
     private val autoHideMenuFab = Runnable {
-        if (::binding.isInitialized) binding.menuFab.hide()
+        if (!::binding.isInitialized) return@Runnable
+        if (BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) return@Runnable
+        binding.menuFab.hide()
     }
     private val showMenuFabRunnable = Runnable {
         if (!::binding.isInitialized) return@Runnable
         if (isInFullscreen() || binding.menuOverlay.isVisible) return@Runnable
         binding.menuFab.show()
-        handler.postDelayed(autoHideMenuFab, MENU_BUTTON_AUTO_HIDE_DELAY_MS)
+        if (!BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) {
+            handler.postDelayed(autoHideMenuFab, MENU_BUTTON_AUTO_HIDE_DELAY_MS)
+        }
     }
+    private val pickStartPageBackgroundLauncher =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            handleStartPageBackgroundPicked(uri)
+        }
 
     private var webView: android.webkit.WebView? = null
-    private var currentUrl: String = BrowserPreferences.defaultUrl()
+    private var currentUrl: String = ""
     private var currentPageTitle: String = ""
     private var currentUserAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
     private var browserCallbacks: BrowserCallbacks? = null
@@ -86,10 +104,20 @@ class MainActivity : AppCompatActivity() {
     private val umamiTracker: UmamiTracker by lazy { UmamiTracker(applicationContext) }
     private var pendingPermissionRequest: android.webkit.PermissionRequest? = null
     private var speechBridge: com.kododake.aabrowser.web.SpeechRecognitionBridge? = null
+    private var isShowingStartPage: Boolean = false
+    private var isSyncingAddressFields: Boolean = false
+
+    override fun attachBaseContext(newBase: Context?) {
+        if (newBase == null) {
+            super.attachBaseContext(null)
+            return
+        }
+        super.attachBaseContext(BrowserPreferences.createScaledContext(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AppCompatDelegate.setDefaultNightMode(BrowserPreferences.getThemeMode(this).nightMode)
         super.onCreate(savedInstanceState)
-        DynamicColors.applyToActivityIfAvailable(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -118,8 +146,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         webView?.onResume()
+        refreshHomePageMode()
         refreshBookmarks()
+        refreshStartPage()
         syncUserAgentProfile()
+        applyPersistentAddressBarPreference()
+        applyQuickActionButtonPreferences()
     }
 
     override fun onPause() {
@@ -418,8 +450,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupUi() {
         val intentUrl = extractBrowsableUrl(intent)
-        val initialUrl = intentUrl ?: BrowserPreferences.resolveInitialUrl(this)
-        currentUrl = initialUrl
+        val homePageUrl = BrowserPreferences.getHomePageUrl(this)
+        val lastVisitedUrl = BrowserPreferences.getLastVisitedUrl(this)
+        val resumeLastPageOnLaunch = BrowserPreferences.shouldResumeLastPageOnLaunch(this)
+        val shouldResumeLastPage = resumeLastPageOnLaunch && !lastVisitedUrl.isNullOrBlank()
+        val initialUrl = intentUrl ?: homePageUrl ?: lastVisitedUrl?.takeIf { shouldResumeLastPage } ?: BrowserPreferences.defaultUrl()
+        val launchToStartPage = intentUrl == null && homePageUrl.isNullOrBlank() && !shouldResumeLastPage
+        currentUrl = if (launchToStartPage) "" else initialUrl
         val desktopMode = BrowserPreferences.shouldUseDesktopMode(this)
         currentUserAgentProfile = BrowserPreferences.getUserAgentProfile(this)
 
@@ -429,20 +466,34 @@ class MainActivity : AppCompatActivity() {
             onUrlChange = { url ->
                 runOnUiThread {
                     currentUrl = url
-                    if (binding.addressEdit.text?.toString() != url) {
+                    if (!isShowingStartPage && binding.addressEdit.text?.toString() != url) {
                         binding.addressEdit.setText(url)
                         binding.addressEdit.setSelection(binding.addressEdit.text?.length ?: 0)
                     }
                     BrowserPreferences.persistUrl(this, url)
                     updateNavigationButtons()
-                    updateConnectionSecurityIcon(url)
+                    if (!isShowingStartPage) {
+                        updateConnectionSecurityIcon(url)
+                    }
+                    prefetchSiteIcon(url)
+                    refreshStartPage()
                 }
             },
             onTitleChange = { title ->
                 runOnUiThread {
                     val resolvedTitle = title.orEmpty()
                     currentPageTitle = resolvedTitle
-                    binding.pageTitle.text = resolvedTitle
+                    if (!isShowingStartPage) {
+                        binding.pageTitle.text = resolvedTitle
+                    }
+                }
+            },
+            onFaviconReceived = { url, icon ->
+                runOnUiThread {
+                    SiteIconCache.cacheIcon(this, url, icon)
+                    if (isShowingStartPage) {
+                        refreshStartPage()
+                    }
                 }
             },
             onProgressChange = { progress ->
@@ -485,7 +536,13 @@ class MainActivity : AppCompatActivity() {
 
         webView = binding.webView
         webView?.let { view ->
-            configureWebView(view, browserCallbacks ?: BrowserCallbacks(), desktopMode, currentUserAgentProfile)
+            configureWebView(
+                webView = view,
+                callbacks = browserCallbacks ?: BrowserCallbacks(),
+                useDesktopMode = desktopMode,
+                userAgentProfile = currentUserAgentProfile,
+                allowDarkPages = BrowserPreferences.isBetaForceDarkPagesEnabled(this)
+            )
 
             speechBridge = com.kododake.aabrowser.web.SpeechRecognitionBridge(view) { pageUrl ->
                 requestSpeechRecognitionMicrophoneAccess(pageUrl)
@@ -517,10 +574,20 @@ class MainActivity : AppCompatActivity() {
                 showMenuButtonTemporarily()
                 false
             }
-            view.loadUrl(initialUrl)
+            if (!launchToStartPage) {
+                view.loadUrl(initialUrl)
+            }
         }
 
-        updateConnectionSecurityIcon(initialUrl)
+        if (launchToStartPage) {
+            showStartPage()
+        } else {
+            updateConnectionSecurityIcon(initialUrl)
+            if (binding.addressEdit.text?.toString() != initialUrl) {
+                binding.addressEdit.setText(initialUrl)
+                binding.addressEdit.setSelection(binding.addressEdit.text?.length ?: 0)
+            }
+        }
 
         if (intentUrl != null) {
             BrowserPreferences.persistUrl(this, initialUrl)
@@ -532,39 +599,20 @@ class MainActivity : AppCompatActivity() {
             webView?.updateDesktopMode(isChecked, currentUserAgentProfile)
         }
 
-        binding.addressEdit.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_GO) {
-                navigateToAddress()
-                true
-            } else {
-                false
-            }
-        }
-
-        binding.addressEdit.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: android.text.Editable?) {
-                val hasText = !s.isNullOrEmpty()
-                if (hasText && binding.buttonClearAddress.visibility != View.VISIBLE) {
-                    binding.buttonClearAddress.visibility = View.VISIBLE
-                    binding.buttonClearAddress.alpha = 0f
-                    binding.buttonClearAddress.animate().alpha(1f).setDuration(150).start()
-                } else if (!hasText && binding.buttonClearAddress.visibility == View.VISIBLE) {
-                    binding.buttonClearAddress.animate().alpha(0f).setDuration(100).withEndAction {
-                        binding.buttonClearAddress.visibility = View.GONE
-                    }.start()
-                }
-            }
-        })
-
-        binding.buttonClearAddress.setOnClickListener {
-            binding.addressEdit.setText("")
-            binding.addressEdit.requestFocus()
-            showKeyboard(binding.addressEdit)
-        }
-
-        binding.buttonGo.setOnClickListener { navigateToAddress() }
+        configureAddressField(
+            editText = binding.addressEdit,
+            clearButton = binding.buttonClearAddress,
+            goButton = binding.buttonGo,
+            closeMenuAfterNavigate = true
+        )
+        configureAddressField(
+            editText = binding.persistentAddressEdit,
+            clearButton = binding.persistentButtonClearAddress,
+            goButton = binding.persistentButtonGo,
+            closeMenuAfterNavigate = false
+        )
+        syncAddressFieldsFrom(binding.addressEdit)
+        updateAddressClearButtons()
 
         binding.buttonReload.setOnClickListener {
             webView?.reload()
@@ -601,8 +649,14 @@ class MainActivity : AppCompatActivity() {
         binding.buttonExternalGithub.iconTint = primaryColorStateList
         binding.buttonExternalGithub.setOnClickListener { openUriExternally(Uri.parse(GITHUB_REPO_URL)) }
         binding.buttonBookmarks.setOnClickListener { showBookmarkManager() }
+        binding.buttonStartPage.setOnClickListener {
+            showStartPage()
+            hideMenuOverlay()
+        }
         binding.buttonBookmarkManagerBack.setOnClickListener { hideBookmarkManager() }
         binding.buttonBookmarkAdd.setOnClickListener { addBookmarkForCurrentPage() }
+        binding.buttonBookmarkStartPageAdd.setOnClickListener { addCurrentPageToStartPage() }
+        binding.buttonBookmarkSetHomePage.setOnClickListener { setCurrentPageAsHomePage() }
         binding.buttonQrCodeBack.setOnClickListener { hideQrCodeView() }
         binding.buttonQrCopy.setOnClickListener {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -620,21 +674,198 @@ class MainActivity : AppCompatActivity() {
             hideMenuOverlay()
         }
         binding.buttonSettings.setOnClickListener { showSettingsView() }
+        binding.buttonStartPageBookmarks.setOnClickListener {
+            showMenuOverlay()
+            showBookmarkManager()
+        }
+        binding.buttonStartPageResume.setOnClickListener {
+            val resumeUrl = BrowserPreferences.getLastVisitedUrl(this)
+            if (resumeUrl.isNullOrBlank()) {
+                Toast.makeText(this, R.string.start_page_no_last_page, Toast.LENGTH_SHORT).show()
+            } else {
+                loadUrlFromIntent(resumeUrl)
+            }
+        }
 
-        binding.menuFab.setOnClickListener { showMenuOverlay() }
+        binding.persistentButtonMenu.setOnClickListener { showMenuOverlay() }
+        binding.menuFab.setOnClickListener { handleQuickActionButtonPressed() }
         binding.buttonClose.setOnClickListener { hideMenuOverlay() }
         binding.menuOverlayScrim.setOnClickListener { hideMenuOverlay() }
 
         setupManualDragLogic()
 
         updateNavigationButtons()
+        refreshStartPage()
         showMenuButtonTemporarily()
         refreshBookmarks()
+        refreshHomePageMode()
+        applyPersistentAddressBarPreference()
+        applyQuickActionButtonPreferences()
 
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
             binding.menuVersion.text = getString(R.string.installed_version_label, "v${pInfo.versionName}")
         } catch (_: Exception) {}
+    }
+
+    private fun configureAddressField(
+        editText: com.google.android.material.textfield.TextInputEditText,
+        clearButton: MaterialButton,
+        goButton: MaterialButton,
+        closeMenuAfterNavigate: Boolean
+    ) {
+        editText.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_GO) {
+                navigateToAddress(editText.text?.toString().orEmpty(), closeMenuAfterNavigate)
+                true
+            } else {
+                false
+            }
+        }
+
+        editText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                syncAddressFieldsFrom(editText)
+                updateAddressClearButtons()
+            }
+        })
+
+        clearButton.setOnClickListener {
+            editText.setText("")
+            editText.requestFocus()
+            showKeyboard(editText)
+        }
+
+        goButton.setOnClickListener {
+            navigateToAddress(editText.text?.toString().orEmpty(), closeMenuAfterNavigate)
+        }
+    }
+
+    private fun syncAddressFieldsFrom(
+        source: com.google.android.material.textfield.TextInputEditText
+    ) {
+        if (isSyncingAddressFields) return
+        val text = source.text?.toString().orEmpty()
+        isSyncingAddressFields = true
+        try {
+            val peers = listOf(binding.addressEdit, binding.persistentAddressEdit)
+            peers.filter { it !== source }.forEach { peer ->
+                if (peer.text?.toString() != text) {
+                    peer.setText(text)
+                    if (peer.hasFocus()) {
+                        peer.setSelection(peer.text?.length ?: 0)
+                    }
+                }
+            }
+        } finally {
+            isSyncingAddressFields = false
+        }
+    }
+
+    private fun updateAddressClearButtons() {
+        updateAddressClearButton(binding.buttonClearAddress, !binding.addressEdit.text.isNullOrEmpty())
+        updateAddressClearButton(
+            binding.persistentButtonClearAddress,
+            !binding.persistentAddressEdit.text.isNullOrEmpty()
+        )
+    }
+
+    private fun updateAddressClearButton(button: View, shouldShow: Boolean) {
+        if (shouldShow && button.visibility != View.VISIBLE) {
+            button.visibility = View.VISIBLE
+            button.alpha = 0f
+            button.animate().alpha(1f).setDuration(150).start()
+        } else if (!shouldShow && button.visibility == View.VISIBLE) {
+            button.animate().alpha(0f).setDuration(100).withEndAction {
+                button.visibility = View.GONE
+            }.start()
+        }
+    }
+
+    private fun handleQuickActionButtonPressed() {
+        when (BrowserPreferences.getQuickActionButtonMode(this)) {
+            QuickActionButtonMode.MENU -> showMenuOverlay()
+            QuickActionButtonMode.ADDRESS_BAR -> showMenuOverlay(focusAddressBar = true)
+        }
+    }
+
+    private fun applyPersistentAddressBarPreference() {
+        val shouldShow = BrowserPreferences.shouldAlwaysShowUrlBar(this) && !isInFullscreen()
+        binding.persistentAddressBarCard.isVisible = shouldShow
+
+        val extraTopPadding = if (shouldShow) persistentAddressBarHeightPx() else 0
+        binding.webView.setPadding(0, extraTopPadding, 0, 0)
+
+        val startPagePadding = (24 * resources.displayMetrics.density).toInt()
+        binding.startPageScroll.updatePadding(
+            left = startPagePadding,
+            top = startPagePadding + extraTopPadding,
+            right = startPagePadding,
+            bottom = startPagePadding
+        )
+
+        updateAddressClearButtons()
+        applyQuickActionButtonPreferences()
+    }
+
+    private fun persistentAddressBarHeightPx(): Int {
+        val density = resources.displayMetrics.density
+        return (76 * density).toInt()
+    }
+
+    private fun applyQuickActionButtonPreferences() {
+        if (!::binding.isInitialized) return
+
+        val mode = BrowserPreferences.getQuickActionButtonMode(this)
+        binding.menuFab.setImageResource(
+            if (mode == QuickActionButtonMode.ADDRESS_BAR) {
+                R.drawable.search_24px
+            } else {
+                android.R.drawable.ic_menu_more
+            }
+        )
+        binding.menuFab.contentDescription = getString(
+            if (mode == QuickActionButtonMode.ADDRESS_BAR) {
+                R.string.menu_open_address_bar
+            } else {
+                R.string.menu_open_description
+            }
+        )
+
+        val density = resources.displayMetrics.density
+        val margin = (16 * density).toInt()
+        val position = BrowserPreferences.getQuickActionButtonPosition(this)
+        val layoutParams = binding.menuFab.layoutParams as CoordinatorLayout.LayoutParams
+        layoutParams.gravity = when (position) {
+            QuickActionButtonPosition.BOTTOM_LEFT -> android.view.Gravity.BOTTOM or android.view.Gravity.START
+            QuickActionButtonPosition.BOTTOM_RIGHT -> android.view.Gravity.BOTTOM or android.view.Gravity.END
+            QuickActionButtonPosition.TOP_LEFT -> android.view.Gravity.TOP or android.view.Gravity.START
+            QuickActionButtonPosition.TOP_RIGHT -> android.view.Gravity.TOP or android.view.Gravity.END
+        }
+
+        val topOffset = if (position == QuickActionButtonPosition.TOP_LEFT || position == QuickActionButtonPosition.TOP_RIGHT) {
+            margin + if (binding.persistentAddressBarCard.isVisible) persistentAddressBarHeightPx() else 0
+        } else {
+            margin
+        }
+        layoutParams.setMargins(margin, topOffset, margin, margin)
+        binding.menuFab.layoutParams = layoutParams
+
+        if (BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) {
+            handler.removeCallbacks(showMenuFabRunnable)
+            handler.removeCallbacks(autoHideMenuFab)
+            if (!isInFullscreen() && !binding.menuOverlay.isVisible) {
+                binding.menuFab.show()
+            }
+        }
+    }
+
+    private fun focusMenuAddressBar() {
+        binding.addressEdit.requestFocus()
+        binding.addressEdit.setSelection(binding.addressEdit.text?.length ?: 0)
+        showKeyboard(binding.addressEdit)
     }
 
     private fun setupManualDragLogic() {
@@ -688,6 +919,7 @@ class MainActivity : AppCompatActivity() {
                 binding.bookmarkManagerRoot.isVisible -> hideBookmarkManager()
                 binding.settingsViewRoot.isVisible -> hideSettingsView()
                 binding.menuOverlay.isVisible -> hideMenuOverlay()
+                isShowingStartPage && currentUrl.isNotBlank() -> hideStartPage()
                 webView?.canGoBack() == true -> webView?.goBack()
                 else -> {
                     isEnabled = false
@@ -705,8 +937,7 @@ class MainActivity : AppCompatActivity() {
         webView?.updateUserAgentProfile(latestProfile, BrowserPreferences.shouldUseDesktopMode(this))
     }
 
-    private fun navigateToAddress() {
-        val raw = binding.addressEdit.text?.toString().orEmpty()
+    private fun navigateToAddress(raw: String, closeMenuAfterNavigate: Boolean) {
         val navigable = BrowserPreferences.formatNavigableUrl(raw)
         if (navigable.isEmpty()) return
         val uri = runCatching { Uri.parse(navigable) }.getOrNull() ?: return
@@ -714,27 +945,37 @@ class MainActivity : AppCompatActivity() {
             val host = uri.host?.lowercase()
             if (!BrowserPreferences.isHostAllowedCleartext(this, host)) {
                 val allowOnce = {
+                    hideStartPage()
                     webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
                     webView?.post { webView?.loadUrl(navigable) }
                     kotlin.Unit
                 }
                 val allowHost = {
                     host?.let { BrowserPreferences.addAllowedCleartextHost(this, it) }
+                    hideStartPage()
                     webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
                     webView?.post { webView?.loadUrl(navigable) }
                     kotlin.Unit
                 }
                 val cancel = { kotlin.Unit }
                 browserCallbacks?.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
-                hideMenuOverlay()
+                if (closeMenuAfterNavigate && binding.menuOverlay.isVisible) {
+                    hideMenuOverlay()
+                }
                 return
             }
         }
 
         currentUrl = navigable
         BrowserPreferences.persistUrl(this, navigable)
+        hideStartPage()
         webView?.loadUrl(navigable)
-        hideMenuOverlay()
+        if (closeMenuAfterNavigate && binding.menuOverlay.isVisible) {
+            hideMenuOverlay()
+        } else {
+            hideKeyboard(binding.persistentAddressEdit)
+            binding.persistentAddressEdit.clearFocus()
+        }
     }
 
     private fun loadUrlFromIntent(rawUrl: String) {
@@ -745,12 +986,14 @@ class MainActivity : AppCompatActivity() {
             val host = uri.host?.lowercase()
             if (!BrowserPreferences.isHostAllowedCleartext(this, host)) {
                 val allowOnce = {
+                    hideStartPage()
                     webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
                     webView?.post { webView?.loadUrl(navigable) }
                     kotlin.Unit
                 }
                 val allowHost = {
                     host?.let { BrowserPreferences.addAllowedCleartextHost(this, it) }
+                    hideStartPage()
                     webView?.setTag(R.id.webview_allow_once_uri_tag, navigable)
                     webView?.post { webView?.loadUrl(navigable) }
                     kotlin.Unit
@@ -768,20 +1011,35 @@ class MainActivity : AppCompatActivity() {
 
         currentUrl = navigable
         BrowserPreferences.persistUrl(this, navigable)
+        hideStartPage()
         binding.addressEdit.setText(navigable)
         webView?.loadUrl(navigable)
         hideMenuOverlay()
     }
 
     private fun updateNavigationButtons() {
-        binding.buttonBack.isEnabled = webView?.canGoBack() == true
-        binding.buttonForward.isEnabled = webView?.canGoForward() == true
+        val canInteractWithPage = !isShowingStartPage && currentUrl.isNotBlank()
+        binding.buttonBack.isEnabled = !isShowingStartPage && webView?.canGoBack() == true
+        binding.buttonForward.isEnabled = !isShowingStartPage && webView?.canGoForward() == true
+        binding.buttonReload.isEnabled = canInteractWithPage
+        binding.buttonExternal.isEnabled = canInteractWithPage
+        binding.desktopSwitch.isEnabled = !isShowingStartPage
+        binding.desktopSwitch.alpha = if (binding.desktopSwitch.isEnabled) 1f else 0.6f
     }
 
     private fun updateConnectionSecurityIcon(url: String?) {
-        val isSecure = try { url?.lowercase()?.startsWith("https://") == true } catch (_: Exception) { false }
+        if (url.isNullOrBlank()) {
+            binding.addressSecureIcon.visibility = View.GONE
+            binding.addressInsecureIcon.visibility = View.GONE
+            binding.persistentAddressSecureIcon.visibility = View.GONE
+            binding.persistentAddressInsecureIcon.visibility = View.GONE
+            return
+        }
+        val isSecure = try { url.lowercase().startsWith("https://") } catch (_: Exception) { false }
         binding.addressSecureIcon.visibility = if (isSecure) View.VISIBLE else View.GONE
         binding.addressInsecureIcon.visibility = if (isSecure) View.GONE else View.VISIBLE
+        binding.persistentAddressSecureIcon.visibility = if (isSecure) View.VISIBLE else View.GONE
+        binding.persistentAddressInsecureIcon.visibility = if (isSecure) View.GONE else View.VISIBLE
     }
 
     private fun updateProgress(progress: Int) {
@@ -789,7 +1047,7 @@ class MainActivity : AppCompatActivity() {
         if (progress in 1..99) binding.progressIndicator.setProgressCompat(progress, true)
     }
 
-    private fun showMenuOverlay() {
+    private fun showMenuOverlay(focusAddressBar: Boolean = false) {
         binding.menuOverlay.visibility = View.VISIBLE
         binding.menuCard.post {
             binding.menuCard.translationY = binding.menuCard.height.toFloat()
@@ -802,10 +1060,15 @@ class MainActivity : AppCompatActivity() {
                 .alpha(1f)
                 .setDuration(300)
                 .start()
+            if (focusAddressBar) {
+                focusMenuAddressBar()
+            }
         }
         handler.removeCallbacks(showMenuFabRunnable)
+        handler.removeCallbacks(autoHideMenuFab)
         binding.menuFab.hide()
         refreshBookmarks()
+        refreshStartPage()
     }
 
     private fun hideMenuOverlay() {
@@ -830,6 +1093,10 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(showMenuFabRunnable)
         handler.removeCallbacks(autoHideMenuFab)
         if (isInFullscreen() || binding.menuOverlay.isVisible) return
+        if (BrowserPreferences.isQuickActionButtonAlwaysVisible(this)) {
+            binding.menuFab.show()
+            return
+        }
         handler.postDelayed(showMenuFabRunnable, MENU_BUTTON_SHOW_DELAY_MS)
     }
 
@@ -865,6 +1132,7 @@ class MainActivity : AppCompatActivity() {
         customViewCallback = callback
         if (binding.menuOverlay.isVisible) hideMenuOverlay()
         binding.menuFab.hide()
+        binding.persistentAddressBarCard.visibility = View.GONE
         binding.webView.visibility = View.INVISIBLE
         binding.fullscreenContainer.apply {
             visibility = View.VISIBLE
@@ -886,12 +1154,16 @@ class MainActivity : AppCompatActivity() {
         customView = null
         customViewCallback = null
         if (!fromWebChrome) callback?.onCustomViewHidden()
+        applyPersistentAddressBarPreference()
         showMenuButtonTemporarily()
     }
 
     private fun addBookmarkForCurrentPage() {
         val url = currentUrl.trim()
-        if (url.isEmpty()) return
+        if (!isActiveWebsiteUrl(url) || isShowingStartPage) {
+            Toast.makeText(this, R.string.start_page_add_current_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
         if (BrowserPreferences.addBookmark(this, url)) {
             Toast.makeText(this, R.string.bookmark_added, Toast.LENGTH_SHORT).show()
             refreshBookmarks()
@@ -900,16 +1172,110 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun addCurrentPageToStartPage() {
+        val url = currentUrl.trim()
+        if (isHomePageEnabled()) {
+            Toast.makeText(this, R.string.start_page_add_disabled_by_home_page, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!isActiveWebsiteUrl(url) || isShowingStartPage) {
+            Toast.makeText(this, R.string.start_page_add_current_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        BrowserPreferences.addBookmark(this, url)
+        showStartPageSlotPicker(url)
+    }
+
+    private fun setCurrentPageAsHomePage() {
+        val url = currentUrl.trim()
+        if (!isActiveWebsiteUrl(url) || isShowingStartPage) {
+            Toast.makeText(this, R.string.home_page_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        BrowserPreferences.setHomePageUrl(this, url)
+        Toast.makeText(this, R.string.home_page_set, Toast.LENGTH_SHORT).show()
+        handleHomePagePreferenceChanged()
+    }
+
     private fun removeBookmark(url: String) {
         if (BrowserPreferences.removeBookmark(this, url)) {
             Toast.makeText(this, R.string.bookmark_removed, Toast.LENGTH_SHORT).show()
             refreshBookmarks()
+            refreshStartPage()
         }
+    }
+
+    private fun showStartPageSlotPicker(url: String) {
+        if (isHomePageEnabled()) {
+            Toast.makeText(this, R.string.start_page_add_disabled_by_home_page, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val normalizedUrl = BrowserPreferences.formatNavigableUrl(url)
+        val slots = BrowserPreferences.getStartPageSlots(this)
+        val existingSlot = BrowserPreferences.findStartPageSlot(this, normalizedUrl)
+        var selectedSlot = when {
+            existingSlot >= 0 -> existingSlot
+            else -> slots.indexOfFirst { it.isNullOrBlank() }.takeIf { it >= 0 } ?: 0
+        }
+        val slotLabels = Array(BrowserPreferences.MAX_START_PAGE_SITES) { index ->
+            val slotLabel = getString(R.string.start_page_slot_number, index + 1)
+            val slotUrl = slots.getOrNull(index)
+            val summary = if (slotUrl.isNullOrBlank()) {
+                getString(R.string.start_page_slot_empty_title)
+            } else {
+                displayLabelForUrl(slotUrl)
+            }
+            "$slotLabel - $summary"
+        }
+
+        val dialogBuilder = com.google.android.material.dialog.MaterialAlertDialogBuilder(
+            this,
+            com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog
+        )
+            .setTitle(R.string.start_page_slot_picker_title)
+            .setSingleChoiceItems(slotLabels, selectedSlot) { _, which ->
+                selectedSlot = which
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.start_page_slot_picker_save) { _, _ ->
+                BrowserPreferences.addBookmark(this, normalizedUrl)
+                BrowserPreferences.setStartPageSlot(this, selectedSlot, normalizedUrl)
+                refreshBookmarks()
+                refreshStartPage()
+                Toast.makeText(
+                    this,
+                    getString(R.string.start_page_slot_saved, getString(R.string.start_page_slot_number, selectedSlot + 1)),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+        if (existingSlot >= 0) {
+            dialogBuilder.setNeutralButton(R.string.start_page_slot_picker_remove) { _, _ ->
+                BrowserPreferences.clearStartPageSlot(this, existingSlot)
+                refreshBookmarks()
+                refreshStartPage()
+                Toast.makeText(this, R.string.start_page_slot_removed, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        dialogBuilder.show()
     }
 
     private fun refreshBookmarks() {
         val container = binding.bookmarkManagerList
         val density = resources.displayMetrics.density
+        val canUseCurrentPage = !isShowingStartPage && isActiveWebsiteUrl(currentUrl)
+        val homePageEnabled = isHomePageEnabled()
+        val currentHomePage = BrowserPreferences.getHomePageUrl(this)
+
+        binding.buttonBookmarkAdd.isEnabled = canUseCurrentPage
+        binding.buttonBookmarkAdd.alpha = if (canUseCurrentPage) 1f else 0.6f
+        binding.buttonBookmarkStartPageAdd.isEnabled = canUseCurrentPage && !homePageEnabled
+        binding.buttonBookmarkStartPageAdd.alpha = if (canUseCurrentPage && !homePageEnabled) 1f else 0.6f
+        binding.buttonBookmarkSetHomePage.isEnabled = canUseCurrentPage
+        binding.buttonBookmarkSetHomePage.alpha = if (canUseCurrentPage) 1f else 0.6f
+
         container.removeAllViews()
         val bookmarks = BrowserPreferences.getBookmarks(this)
         if (bookmarks.isEmpty()) {
@@ -922,6 +1288,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         bookmarks.forEach { bookmark ->
+            val startPageSlot = BrowserPreferences.findStartPageSlot(this, bookmark)
+            val isHomePageBookmark = currentHomePage == bookmark
             val itemCard = com.google.android.material.card.MaterialCardView(this).apply {
                 radius = 12 * density
                 setCardBackgroundColor(resolveThemeColor(com.google.android.material.R.attr.colorSurfaceContainer))
@@ -939,7 +1307,13 @@ class MainActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = (12 * density).toInt() }
             }
             textContainer.addView(MaterialTextView(this).apply {
-                text = try { java.net.URI(bookmark).host ?: bookmark } catch (_: Exception) { bookmark }
+                text = getString(R.string.start_page_slot_number, (startPageSlot + 1).coerceAtLeast(1))
+                visibility = if (startPageSlot >= 0) View.VISIBLE else View.GONE
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
+                setTextColor(resolveThemeColor(androidx.appcompat.R.attr.colorPrimary))
+            })
+            textContainer.addView(MaterialTextView(this).apply {
+                text = displayLabelForUrl(bookmark)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge)
@@ -951,21 +1325,153 @@ class MainActivity : AppCompatActivity() {
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
                 alpha = 0.7f
             })
+            if (startPageSlot >= 0) {
+                textContainer.addView(MaterialTextView(this).apply {
+                    text = getString(
+                        R.string.bookmark_start_page_badge,
+                        getString(R.string.start_page_slot_number, startPageSlot + 1)
+                    )
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                    setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    alpha = 0.8f
+                })
+            }
+            if (isHomePageBookmark) {
+                textContainer.addView(MaterialTextView(this).apply {
+                    text = getString(R.string.bookmark_home_page_badge)
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                    setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    alpha = 0.8f
+                })
+            }
+            val pinBtn = MaterialButton(ContextThemeWrapper(this, com.google.android.material.R.style.Widget_Material3_Button_IconButton_Filled_Tonal)).apply {
+                layoutParams = LinearLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt()).apply {
+                    marginEnd = (8 * density).toInt()
+                }
+                setIconResource(R.drawable.kid_star_24px)
+                iconPadding = 0
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                val backgroundTint = if (startPageSlot >= 0) {
+                    resolveThemeColor(com.google.android.material.R.attr.colorPrimaryContainer)
+                } else {
+                    resolveThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
+                }
+                val iconTintColor = if (startPageSlot >= 0) {
+                    resolveThemeColor(com.google.android.material.R.attr.colorOnPrimaryContainer)
+                } else {
+                    resolveThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
+                }
+                backgroundTintList = ColorStateList.valueOf(backgroundTint)
+                iconTint = ColorStateList.valueOf(iconTintColor)
+                contentDescription = if (startPageSlot >= 0) {
+                    getString(R.string.start_page_slot_picker_remove)
+                } else {
+                    getString(R.string.menu_start_page_add_current)
+                }
+                isEnabled = !homePageEnabled
+                alpha = if (homePageEnabled) 0.5f else 1f
+                setOnClickListener {
+                    if (homePageEnabled) {
+                        Toast.makeText(this@MainActivity, R.string.start_page_add_disabled_by_home_page, Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    if (startPageSlot >= 0) {
+                        BrowserPreferences.clearStartPageSlot(this@MainActivity, startPageSlot)
+                        Toast.makeText(this@MainActivity, R.string.start_page_slot_removed, Toast.LENGTH_SHORT).show()
+                        refreshBookmarks()
+                        refreshStartPage()
+                    } else {
+                        showStartPageSlotPicker(bookmark)
+                    }
+                }
+            }
             val delBtn = MaterialButton(ContextThemeWrapper(this, com.google.android.material.R.style.Widget_Material3_Button_IconButton_Filled_Tonal)).apply {
                 layoutParams = LinearLayout.LayoutParams((40 * density).toInt(), (40 * density).toInt())
                 setIconResource(R.drawable.bookmark_remove_24px)
                 setIconTint(ColorStateList.valueOf(Color.WHITE))
                 iconPadding = 0
                 iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-                setBackgroundColor(resolveThemeColor(android.R.attr.colorError))
+                backgroundTintList = ColorStateList.valueOf(resolveThemeColor(android.R.attr.colorError))
                 setOnClickListener { removeBookmark(bookmark) }
             }
             row.addView(textContainer)
+            row.addView(pinBtn)
             row.addView(delBtn)
             itemCard.addView(row)
             val params = LinearLayout.LayoutParams(-1, -2)
             params.setMargins(0, (8 * density).toInt(), 0, 0)
             container.addView(itemCard, params)
+        }
+    }
+
+    private fun isActiveWebsiteUrl(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+        return scheme == "http" || scheme == "https"
+    }
+
+    private fun displayLabelForUrl(url: String): String {
+        return try {
+            java.net.URI(url).host ?: url
+        } catch (_: Exception) {
+            url
+        }
+    }
+
+    private fun displayTitleForUrl(url: String): String {
+        val host = runCatching { java.net.URI(url).host?.lowercase() }.getOrNull().orEmpty()
+        val normalizedHost = host.removePrefix("www.").removePrefix("m.")
+        val mappedTitle = when (normalizedHost) {
+            "youtube.com" -> "YouTube"
+            "google.com" -> "Google"
+            "twitch.tv" -> "Twitch"
+            "kick.com" -> "Kick"
+            "wikipedia.org" -> "Wikipedia"
+            "weather.com" -> "Weather"
+            else -> null
+        }
+        if (mappedTitle != null) return mappedTitle
+
+        val primarySegment = normalizedHost
+            .substringBefore('.')
+            .split('-', '_')
+            .firstOrNull()
+            .orEmpty()
+        if (primarySegment.isBlank()) return displayLabelForUrl(url)
+
+        return primarySegment.replaceFirstChar { char ->
+            if (char.isLowerCase()) char.titlecase() else char.toString()
+        }
+    }
+
+    private fun prefetchSiteIcon(url: String?) {
+        if (!isActiveWebsiteUrl(url)) return
+        SiteIconCache.prefetchIconIfNeeded(this, url) { bitmap ->
+            if (bitmap != null && isShowingStartPage) {
+                refreshStartPage()
+            }
+        }
+    }
+
+    private fun isHomePageEnabled(): Boolean {
+        return !BrowserPreferences.getHomePageUrl(this).isNullOrBlank()
+    }
+
+    private fun refreshHomePageMode() {
+        binding.buttonStartPage.isVisible = !isHomePageEnabled()
+    }
+
+    private fun handleHomePagePreferenceChanged() {
+        val homePageUrl = BrowserPreferences.getHomePageUrl(this)
+        refreshHomePageMode()
+        refreshBookmarks()
+        refreshStartPage()
+        rebuildSettingsContent()
+
+        if (!homePageUrl.isNullOrBlank() && isShowingStartPage) {
+            loadUrlFromIntent(homePageUrl)
+        } else {
+            updateNavigationButtons()
         }
     }
 
@@ -978,6 +1484,277 @@ class MainActivity : AppCompatActivity() {
     private fun hideBookmarkManager() {
         binding.bookmarkManagerRoot.visibility = View.GONE
         binding.menuScroll.visibility = View.VISIBLE
+    }
+
+    private fun showStartPage() {
+        val homePageUrl = BrowserPreferences.getHomePageUrl(this)
+        if (!homePageUrl.isNullOrBlank()) {
+            Toast.makeText(this, R.string.start_page_disabled_by_home_page, Toast.LENGTH_SHORT).show()
+            loadUrlFromIntent(homePageUrl)
+            return
+        }
+        if (isInFullscreen()) exitFullscreen()
+        isShowingStartPage = true
+        binding.startPageRoot.visibility = View.VISIBLE
+        binding.webView.visibility = View.INVISIBLE
+        binding.pageTitle.text = getString(R.string.start_page_title)
+        binding.addressEdit.setText("")
+        updateConnectionSecurityIcon(null)
+        refreshStartPage()
+        updateNavigationButtons()
+        showMenuButtonTemporarily()
+    }
+
+    private fun hideStartPage() {
+        if (!isShowingStartPage && binding.startPageRoot.visibility != View.VISIBLE) return
+        isShowingStartPage = false
+        binding.startPageRoot.visibility = View.GONE
+        binding.webView.visibility = View.VISIBLE
+        binding.pageTitle.text = currentPageTitle.ifBlank {
+            currentUrl.takeIf { it.isNotBlank() }?.let(::displayLabelForUrl).orEmpty()
+        }
+        if (currentUrl.isNotBlank()) {
+            if (binding.addressEdit.text?.toString() != currentUrl) {
+                binding.addressEdit.setText(currentUrl)
+                binding.addressEdit.setSelection(binding.addressEdit.text?.length ?: 0)
+            }
+        } else {
+            binding.addressEdit.setText("")
+        }
+        updateConnectionSecurityIcon(currentUrl.takeIf { isActiveWebsiteUrl(it) })
+        updateNavigationButtons()
+        refreshBookmarks()
+    }
+
+    private fun refreshStartPage() {
+        refreshStartPageQuickLinks()
+        refreshStartPageBackground()
+        refreshStartPageResumeButton()
+    }
+
+    private fun refreshStartPageBackground() {
+        val backgroundUri = BrowserPreferences.getStartPageBackgroundUri(this)
+        if (backgroundUri.isNullOrBlank()) {
+            binding.startPageBackgroundImage.setImageBitmap(null)
+            binding.startPageBackgroundImage.visibility = View.GONE
+            return
+        }
+
+        val bitmap = runCatching {
+            contentResolver.openInputStream(Uri.parse(backgroundUri))?.use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+        }.getOrNull()
+
+        if (bitmap != null) {
+            binding.startPageBackgroundImage.setImageBitmap(bitmap)
+            binding.startPageBackgroundImage.visibility = View.VISIBLE
+        } else {
+            binding.startPageBackgroundImage.setImageBitmap(null)
+            binding.startPageBackgroundImage.visibility = View.GONE
+        }
+    }
+
+    private fun refreshStartPageQuickLinks() {
+        val container = binding.startPageQuickLinksContainer
+        val density = resources.displayMetrics.density
+        container.removeAllViews()
+
+        val slots = BrowserPreferences.getStartPageSlots(this)
+        val rows = (BrowserPreferences.MAX_START_PAGE_SITES + 1) / 2
+        repeat(rows) { rowIndex ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                    if (rowIndex > 0) topMargin = (12 * density).toInt()
+                }
+            }
+
+            repeat(2) { columnIndex ->
+                val slotIndex = rowIndex * 2 + columnIndex
+                if (slotIndex >= BrowserPreferences.MAX_START_PAGE_SITES) return@repeat
+                val slotUrl = slots.getOrNull(slotIndex)
+                row.addView(
+                    createStartPageSlotCard(slotIndex, slotUrl).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                            if (columnIndex == 0) {
+                                marginEnd = (6 * density).toInt()
+                            } else {
+                                marginStart = (6 * density).toInt()
+                            }
+                        }
+                    }
+                )
+            }
+
+            container.addView(row)
+        }
+    }
+
+    private fun createStartPageSlotCard(slotIndex: Int, url: String?): View {
+        val density = resources.displayMetrics.density
+        val cachedIcon = SiteIconCache.getCachedIcon(this, url)
+        if (cachedIcon == null && !url.isNullOrBlank()) {
+            prefetchSiteIcon(url)
+        }
+        return com.google.android.material.card.MaterialCardView(this).apply {
+            radius = 18 * density
+            strokeWidth = (1 * density).toInt()
+            strokeColor = resolveThemeColor(com.google.android.material.R.attr.colorOutlineVariant)
+            setCardBackgroundColor(resolveThemeColor(com.google.android.material.R.attr.colorSurfaceContainerLowest))
+            setOnClickListener {
+                if (url.isNullOrBlank()) {
+                    showMenuOverlay()
+                    showBookmarkManager()
+                } else {
+                    loadUrlFromIntent(url)
+                }
+            }
+
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+
+                    addView(FrameLayout(this@MainActivity).apply {
+                        val size = (48 * density).toInt()
+                        layoutParams = LinearLayout.LayoutParams(size, size)
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.RECTANGLE
+                            cornerRadius = 14 * density
+                            setColor(
+                                if (url.isNullOrBlank()) {
+                                    resolveThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
+                                } else {
+                                    resolveThemeColor(com.google.android.material.R.attr.colorPrimaryContainer)
+                                }
+                            )
+                        }
+
+                        addView(ImageView(this@MainActivity).apply {
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            scaleType = ImageView.ScaleType.CENTER_INSIDE
+                            setPadding((10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt())
+                            setImageBitmap(cachedIcon)
+                            visibility = if (cachedIcon != null) View.VISIBLE else View.GONE
+                        })
+
+                        addView(MaterialTextView(this@MainActivity).apply {
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            gravity = android.view.Gravity.CENTER
+                            text = if (url.isNullOrBlank()) {
+                                "+"
+                            } else {
+                                displayLabelForUrl(url).firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+                            }
+                            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+                            setTextColor(
+                                if (url.isNullOrBlank()) {
+                                    resolveThemeColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
+                                } else {
+                                    resolveThemeColor(com.google.android.material.R.attr.colorOnPrimaryContainer)
+                                }
+                            )
+                            visibility = if (cachedIcon == null) View.VISIBLE else View.GONE
+                        })
+                    })
+
+                    addView(MaterialTextView(this@MainActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                            marginStart = (12 * density).toInt()
+                        }
+                        text = if (url.isNullOrBlank()) {
+                            getString(R.string.start_page_slot_empty_title)
+                        } else {
+                            displayLabelForUrl(url)
+                        }
+                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelMedium)
+                        setTextColor(resolveThemeColor(androidx.appcompat.R.attr.colorPrimary))
+                    })
+                })
+
+                addView(MaterialTextView(this@MainActivity).apply {
+                    text = if (url.isNullOrBlank()) {
+                        getString(R.string.start_page_slot_empty_title)
+                    } else {
+                        displayTitleForUrl(url)
+                    }
+                    setPadding(0, (12 * density).toInt(), 0, 0)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+                })
+
+                addView(MaterialTextView(this@MainActivity).apply {
+                    text = if (url.isNullOrBlank()) {
+                        getString(R.string.start_page_slot_empty_subtitle)
+                    } else {
+                        url
+                    }
+                    setPadding(0, (6 * density).toInt(), 0, 0)
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                    setTextColor(resolveThemeColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                })
+            })
+        }
+    }
+
+    private fun refreshStartPageResumeButton() {
+        binding.buttonStartPageResume.isVisible = !BrowserPreferences.getLastVisitedUrl(this).isNullOrBlank()
+    }
+
+    private fun handleStartPageBackgroundPicked(uri: Uri?) {
+        if (uri == null) return
+
+        val canReadImage = runCatching {
+            contentResolver.openInputStream(uri)?.use { true } ?: false
+        }.getOrDefault(false)
+        if (!canReadImage) {
+            Toast.makeText(this, R.string.start_page_background_error, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        runCatching {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        val previousUri = BrowserPreferences.getStartPageBackgroundUri(this)
+        BrowserPreferences.setStartPageBackgroundUri(this, uri.toString())
+        if (!previousUri.isNullOrBlank() && previousUri != uri.toString()) {
+            releaseStartPageBackgroundPermission(previousUri)
+        }
+        refreshStartPage()
+        rebuildSettingsContent()
+        Toast.makeText(this, R.string.start_page_background_set, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun clearStartPageBackground() {
+        val previousUri = BrowserPreferences.getStartPageBackgroundUri(this)
+        if (previousUri.isNullOrBlank()) return
+        releaseStartPageBackgroundPermission(previousUri)
+        BrowserPreferences.clearStartPageBackgroundUri(this)
+        refreshStartPage()
+        rebuildSettingsContent()
+        Toast.makeText(this, R.string.start_page_background_cleared, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun releaseStartPageBackgroundPermission(uriString: String) {
+        runCatching {
+            contentResolver.releasePersistableUriPermission(Uri.parse(uriString), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    private fun rebuildSettingsContent() {
+        if (!::binding.isInitialized) return
+        binding.settingsContentContainer.removeAllViews()
+        if (binding.settingsViewRoot.isVisible) {
+            ensureSettingsContentPopulated()
+        }
     }
 
     private fun showQrCodeView() {
@@ -1005,9 +1782,27 @@ class MainActivity : AppCompatActivity() {
     private fun ensureSettingsContentPopulated() {
         if (binding.settingsContentContainer.childCount > 0) return
         try {
-            val contentView = SettingsViews.createSettingsContent(this, false) {
-                hideSettingsView()
-            }
+            val contentView = SettingsViews.createSettingsContent(
+                context = this,
+                includeDragHandle = false,
+                callbacks = com.kododake.aabrowser.settings.SettingsCallbacks(
+                    onClose = { hideSettingsView() },
+                    onThemeChanged = { recreate() },
+                    onPageDarkeningChanged = {
+                        webView?.updatePageDarkening(BrowserPreferences.isBetaForceDarkPagesEnabled(this))
+                    },
+                    onScaleChanged = { recreate() },
+                    onHomePageChanged = { handleHomePagePreferenceChanged() },
+                    onInAppControlsChanged = {
+                        applyPersistentAddressBarPreference()
+                        applyQuickActionButtonPreferences()
+                    },
+                    onPickStartPageBackground = {
+                        pickStartPageBackgroundLauncher.launch(arrayOf("image/*"))
+                    },
+                    onClearStartPageBackground = { clearStartPageBackground() }
+                )
+            )
             binding.settingsContentContainer.addView(contentView)
         } catch (_: Exception) {}
     }

@@ -1,7 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.AABrowser" parent="Theme.Material3.DynamicColors.DayNight.NoActionBar" />
+    <style name="Theme.AABrowser" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/theme_primary</item>
+        <item name="colorOnPrimary">@color/theme_on_primary</item>
+        <item name="colorPrimaryContainer">@color/theme_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/theme_on_primary_container</item>
+        <item name="colorSecondary">@color/theme_secondary</item>
+        <item name="colorOnSecondary">@color/theme_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/theme_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/theme_on_secondary_container</item>
+        <item name="colorTertiary">@color/theme_tertiary</item>
+        <item name="colorOnTertiary">@color/theme_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/theme_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/theme_on_tertiary_container</item>
+        <item name="colorError">@color/theme_error</item>
+        <item name="colorOnError">@color/theme_on_error</item>
+        <item name="colorErrorContainer">@color/theme_error_container</item>
+        <item name="colorOnErrorContainer">@color/theme_on_error_container</item>
+        <item name="android:colorBackground">@color/theme_background</item>
+        <item name="colorOnBackground">@color/theme_on_background</item>
+        <item name="colorSurface">@color/theme_surface</item>
+        <item name="colorOnSurface">@color/theme_on_surface</item>
+        <item name="colorSurfaceVariant">@color/theme_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/theme_on_surface_variant</item>
+        <item name="colorOutline">@color/theme_outline</item>
+        <item name="colorOutlineVariant">@color/theme_outline_variant</item>
+        <item name="colorSurfaceContainerLowest">@color/theme_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/theme_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/theme_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/theme_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/theme_surface_container_highest</item>
+        <item name="android:windowBackground">@color/theme_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/theme_background</item>
+    </style>
 
     <!-- Bottom Sheet Shape -->
     <style name="ShapeAppearanceOverlay.App.Card.BottomSheet" parent="">
