@@ -1,29 +1,30 @@
-# <img src="https://github.com/user-attachments/assets/fa4252fa-b71e-4c87-9b93-d8ad832434cc" width="48" height="48" valign="bottom" /> AA Browser
+# <img src="https://github.com/user-attachments/assets/fa4252fa-b71e-4c87-9b93-d8ad832434cc" width="48" height="48" valign="bottom" /> AA Browser — Fork Edition
 
-[![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://www.android.com/)
+[![Android](https://img.shields.io/badge/Android-10%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://www.android.com/)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
-[<img src="https://github.com/user-attachments/assets/1551eaef-432d-4634-875c-f085870d00a1" alt="Get it on Obtainium" height="40">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.kododake.aabrowser%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkododake%2FAABrowser%22%2C%22author%22%3A%22kododake%22%2C%22name%22%3A%22AABrowser%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D)
+[<img src="https://github.com/user-attachments/assets/1551eaef-432d-4634-875c-f085870d00a1" alt="Get it on Obtainium" height="40">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.kododake.aabrowser%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2FVeniamin668%2FAABrowser-fork%22%2C%22author%22%3A%22Veniamin668%22%2C%22name%22%3A%22AABrowser%20Fork%22%7D)
 
-
-**The ultimate WebView browser experience for Android Auto head units.**
-Transform your "parked time" with a sleek, modern browser designed specifically for the road.
+**Independent fork of AA Browser — maintained, updated, and improved.**  
+A modern WebView browser for Android Auto head units, now with continued development.
 
 > [!NOTE]
-> **Requires Android 15 or later**
+> **Requires Android 10 or later**  
+> (Original project requires Android 15+)
 >
-> 📲 **Easy Install:** No need for a special installer. Just download and install.
+> 📲 **Easy Install:** Just download and install the APK.
 >
-> 🚀 **Updates:** Using **[Obtainium](https://github.com/ImranR98/Obtainium)** (linked above) is recommended to keep the app automatically up to date without limitations. Alternatively, you can download the APK from [GitHub Releases](https://github.com/kododake/AABrowser/releases).
+> 🚀 **Updates:** Recommended to use **Obtainium** (link above) for automatic updates.  
+> Or download manually from **[Fork Releases](https://github.com/Veniamin668/AABrowser-fork/releases)**.
 
 ---
 
 ## ✨ Features
 
-- 🎯 **Native Automotive UI:** Designed specifically for car displays, not just a stretched phone app.
-- 🎬 **Immersive Media:** Watch fullscreen DRM-protected video (supports Widevine L3 only due to technical limitations) — perfect for charging breaks or while parked in a "flat, boring desert world."
-- 🎨 **Material 3 Design:** Sleek interface with large, driver-friendly touch targets.
-- 🔄 **Smart Desktop Mode:** Seamlessly toggle between mobile and desktop rendering.
-- 📚 **Dashboard Bookmarks:** Quick access to your favorite sites without touching your phone.
+- 🎯 **Native Automotive UI:** Built for car displays.
+- 🎬 **Fullscreen DRM Video:** Widevine L3 support.
+- 🎨 **Material 3 Design:** Clean, modern interface.
+- 🔄 **Desktop Mode:** Switch between mobile/desktop rendering.
+- 📚 **Dashboard Bookmarks:** Quick access to your favorite sites.
 
 <div align="left">
   <img width="40%" src="https://github.com/user-attachments/assets/bbce4ab5-d54d-4db7-bbd8-43ff7ff8fd27" alt="Screenshot 1" />
@@ -36,63 +37,61 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 
 #### 🛑 Developer's Safety Request
 
-* **Driver's Duty:** If you're the one steering, **DO NOT LOOK AT THIS APP.** If you think your eyes might wander while driving, **uninstall it right now!** Seriously, your safety is my top priority.
-* **Passenger's Joy:** This app is for your passengers or for when you are safely parked.
-* **Legal Note:** I built the code, but the **GPLv3 license** means I am **NOT RESPONSIBLE** for your actions. Drive smart!
+* **Driver's Duty:** If you're steering, **DO NOT LOOK AT THIS APP.**
+* **Passenger's Joy:** Use only when parked or as a passenger.
+* **Legal Note:** GPLv3 means **you are responsible for your actions**.
 
 ---
 
 #### 🛠️ How to Enable Unknown Sources on Android Auto
 
-To use this app, you must unlock the hidden Developer Settings.
-
-1. **Open Android Auto Settings:** Search for "Android Auto" in your phone's settings.
-2. **Unlock Developer Mode:** Scroll to the bottom and **tap the "Version" section 10 times**. Tap **OK** on the pop-up.
-3. **Open Developer Settings:** Tap the **three-dot menu (⋮)** in the top-right corner -> **Developer settings**.
-4. **Enable Unknown Sources:** Find the **Unknown sources** checkbox and turn it on.
+1. Open **Android Auto** settings.
+2. Scroll down → tap **Version** 10 times.
+3. Tap **⋮ → Developer settings**.
+4. Enable **Unknown sources**.
 
 ---
 
 ## ❓ Troubleshooting
 
-**App not starting?**
-If the app fails to launch, try opening a non-Google Maps navigation app (such as **Waze**) first, then open AA Browser.
+**App not starting?**  
+Open **Waze** (or any non‑Google Maps nav app) first, then launch AA Browser.
 
 ---
 
 ## ⚠️ Current Issues
 
-- 🚫 **No Ad Blocking:** Ad filtering is not currently implemented (contributions welcome!).
-- 🚗 **Stationary Use Only**
+- 🚫 No ad blocking yet.
+- 🚗 For stationary use only.
 
 ---
 
-## 🤝 Contributors
-
-Every contribution makes AA Browser better!
-
-- 🐛 **Found a bug?** Check for existing issues and open a new one with reproduction steps if none are found.
-- 💡 **Got an idea?** Start a discussion.
-- 🔧 **Wanna code?** Fork the repo and submit a PR!
-- 📸 **Show it off:** Share a photo of AA Browser on your dashboard in the Discussions tab!
+## 👥 Contributors (Fork Edition)
 
 <table width="100%">
   <tr>
-    <td align="center" valign="top" width="33%">
+    <td align="center" valign="top" width="25%">
+      <a href="https://github.com/Veniamin668">
+        <img src="https://github.com/Veniamin668.png?s=100" width="60" alt="Veniamin668"/><br />
+        <sub><b>Veniamin668</b></sub>
+      </a><br />
+      <sub>Fork Developer — Maintains and extends the independent fork.</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
       <a href="https://github.com/kododake">
         <img src="https://github.com/kododake.png?s=100" width="60" alt="kododake"/><br />
         <sub><b>kododake</b></sub>
       </a><br />
-      <sub>Project Lead</sub>
+      <sub>Original Project Lead</sub>
     </td>
-    <td align="center" valign="top" width="33%">
+    <td align="center" valign="top" width="25%">
       <a href="https://github.com/cmacrowther">
         <img src="https://github.com/cmacrowther.png?s=100" width="60" alt="Colin Crowther"/><br />
         <sub><b>Colin Crowther</b></sub>
       </a><br />
       <sub>Design Improvements</sub>
     </td>
-    <td align="center" valign="top" width="33%">
+    <td align="center" valign="top" width="25%">
       <a href="https://github.com/jigneshbhavani">
         <img src="https://github.com/jigneshbhavani.png?s=100" width="60" alt="jigneshbhavani"/><br />
         <sub><b>jigneshbhavani</b></sub>
@@ -104,35 +103,54 @@ Every contribution makes AA Browser better!
 
 ---
 
-## 💖 Special Thanks
+## 🔗 Original Project
 
-- **[jdrch](https://github.com/jdrch):** For suggesting **Obtainium**—a brilliant idea for seamless updates!
-- **[Obtainium](https://github.com/ImranR98/Obtainium):** For being an amazing bridge between devs and users.
+This fork is based on the original AA Browser by **kododake**:  
+👉 https://github.com/kododake/AABrowser
 
 ---
 
-## 🛡️ Privacy, Reimagined
-I care about the app's growth, but I care about your privacy even more. This app is designed with a **Transparency-First** policy:
+## 🛠️ Fork Changes (What’s Different)
+
+- ✔ **Supports Android 10+**  
+  (Original project requires Android 15+)
+- ✔ Independent maintenance and updates  
+- ✔ Debug builds available for easier installation  
+- ✔ Updated README, Obtainium link, and metadata  
+- ✔ Cleaned project structure  
+- ✔ Continued compatibility for older devices  
+- ✔ Fork identity and branding added  
+
+---
+
+## 💖 Special Thanks
+
+- **[jdrch](https://github.com/jdrch)** — Suggested Obtainium integration  
+- **[Obtainium](https://github.com/ImranR98/Obtainium)** — Amazing update tool
+
+---
+
+## 🛡️ Privacy
 
 > [!IMPORTANT]
-> **I have ZERO interest in your browsing habits.**
-> - 🚫 **No URL Tracking:** I don't (and physically can't) see which websites you visit, what you search, or what you type.
-> - 🕵️ **Self-Hosted Analytics:** I use a private **Umami** instance. No IP track, No Google, No Meta, no Big Tech trackers.
-> - 🆔 **Anonymous Data:** I only see **"The app was opened"** and **This App Versions**. I use a random, anonymous UUID that isn't tied to your device ID or personal info.
+> **No tracking.**
+> - No URL logging  
+> - No Google/Meta trackers  
+> - Anonymous, self‑hosted Umami analytics  
+> - Only “app opened” + version info  
 
 ---
 
 ## ☕ Support a Student Developer
 
-If AA Browser makes your "car life" better, please consider a donation! As a student developer on a tight budget, your support covers daily expenses.
+If this fork improves your car experience, consider donating!
 
-**Bitcoin (BTC):**
+**Bitcoin (BTC):**  
 `bc1qnpqpfq7e8pjtlqj7aa6x2y2c9ctnpts5u9lx7v`
 
-*If you donate, please let me know in the Discussions! I'd love to add you to our contributor list as a token of my gratitude.*
-
 > [!CAUTION]
-> **No Exchange Transfers for Contributor Listing** > I **cannot** verify or list donations sent directly from cryptocurrency exchanges (e.g., Binance, Coinbase, etc.) because they do not support message signing. To be listed, please send from a wallet where you control the private keys.
+> Do NOT donate from exchanges — they cannot sign messages.
 
 ---
+
 **Stay safe, keep your eyes on the road, and happy browsing! 🚗💨**
