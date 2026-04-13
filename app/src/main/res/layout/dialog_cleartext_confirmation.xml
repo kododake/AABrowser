@@ -111,7 +111,7 @@
                 android:layout_height="wrap_content"
                 android:text="Allow once"
                 app:iconTint="@null"
-                android:textColor="#B00020" />
+                android:textColor="?attr/colorError" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_allow_host"
@@ -121,7 +121,7 @@
                 android:text="Always allow for this host"
                 android:layout_marginTop="8dp"
                 app:iconTint="@null"
-                android:textColor="#B00020" />
+                android:textColor="?attr/colorError" />
 
         </LinearLayout>
     </LinearLayout>

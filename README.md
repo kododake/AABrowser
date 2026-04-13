@@ -21,13 +21,30 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 
 - 🎯 **Native Automotive UI:** Designed specifically for car displays, not just a stretched phone app.
 - 🎬 **Immersive Media:** Watch fullscreen DRM-protected video (supports Widevine L3 only due to technical limitations) — perfect for charging breaks or while parked in a "flat, boring desert world."
-- 🎨 **Material 3 Design:** Sleek interface with large, driver-friendly touch targets.
+- 🎨 **Light + AMOLED Themes:** Switch between a bright light theme and a true-black AMOLED dark mode built for car displays.
+- 🌓 **Beta Dark Pages:** Optionally ask WebView to darken supported pages while the dark theme is active.
+- 🏠 **Home Page Or Start Page:** Launch straight into a custom home page, or use the start page dashboard when no home page is set.
+- 🚀 **Six Quick Links:** The start page now supports up to six shortcut cards with default popular sites and a custom background image.
+- 🗂️ **Real Tabs + Tab Manager:** Open multiple browser tabs, switch between them from the in-app tab manager, and close tabs without losing your place.
+- ♻️ **Restore Last Tabs:** Optionally reopen the full tab session from your previous launch when no home page override is active.
+- 🔁 **Resume Last Page:** Optionally reopen the last visited page on launch when no home page is configured.
+- 🧭 **Persistent URL Bar:** Optionally keep a compact address bar visible above the page for faster browsing.
+- 🎛️ **Configurable Quick Action Button:** Choose whether the floating button opens the controls menu or jumps straight to the URL bar, keep it always visible, and move it to a corner that fits your screen.
+- 🖼️ **Cached Site Icons:** Quick-link cards cache first-party site icons locally so the start page stays branded without refetching on every launch.
+- 🔎 **Global Display Scale:** Adjust the full UI and page-content scale together with presets or a custom percentage.
 - 🔄 **Smart Desktop Mode:** Seamlessly toggle between mobile and desktop rendering.
 - 📚 **Dashboard Bookmarks:** Quick access to your favorite sites without touching your phone.
 
-<div align="left">
-  <img width="40%" src="https://github.com/user-attachments/assets/bbce4ab5-d54d-4db7-bbd8-43ff7ff8fd27" alt="Screenshot 1" />
-  <img width="40%" src="https://github.com/user-attachments/assets/cf969316-dbfb-4b38-83bb-3e36d1e6f8ff" alt="Screenshot 2" />
+
+<div align="center">
+  <img width="90%" src="docs/img/aabrowser1.png" alt="AA Browser showcase screenshot" />
+</div>
+
+### 📸 Screenshots
+
+<div align="center">
+  <img width="44%" src="docs/screenshots/litemode.gif" alt="AA Browser light mode live screenshot" />
+  <img width="44%" src="docs/screenshots/darkmode.gif" alt="AA Browser dark mode live screenshot" />
 </div>
 
 ---
@@ -78,26 +95,33 @@ Every contribution makes AA Browser better!
 
 <table width="100%">
   <tr>
-    <td align="center" valign="top" width="33%">
+    <td align="center" valign="top" width="25%">
       <a href="https://github.com/kododake">
         <img src="https://github.com/kododake.png?s=100" width="60" alt="kododake"/><br />
         <sub><b>kododake</b></sub>
       </a><br />
       <sub>Project Lead</sub>
     </td>
-    <td align="center" valign="top" width="33%">
+    <td align="center" valign="top" width="25%">
       <a href="https://github.com/cmacrowther">
         <img src="https://github.com/cmacrowther.png?s=100" width="60" alt="Colin Crowther"/><br />
         <sub><b>Colin Crowther</b></sub>
       </a><br />
       <sub>Design Improvements</sub>
     </td>
-    <td align="center" valign="top" width="33%">
+    <td align="center" valign="top" width="25%">
       <a href="https://github.com/jigneshbhavani">
         <img src="https://github.com/jigneshbhavani.png?s=100" width="60" alt="jigneshbhavani"/><br />
         <sub><b>jigneshbhavani</b></sub>
       </a><br />
       <sub>Microphone Support</sub>
+    </td>
+    <td align="center" valign="top" width="25%">
+      <a href="https://github.com/SaveEditors">
+        <img src="https://github.com/SaveEditors.png?s=100" width="60" alt="SaveEditors"/><br />
+        <sub><b>SaveEditors</b></sub>
+      </a><br />
+      <sub>Multi-tab support, Home screen</sub>
     </td>
   </tr>
 </table>
@@ -125,6 +149,9 @@ I care about the app's growth, but I care about your privacy even more. This app
 ## ☕ Support a Student Developer
 
 If AA Browser makes your "car life" better, please consider a donation! As a student developer on a tight budget, your support covers daily expenses.
+
+**GitHub Sponsor:**
+https://github.com/sponsors/kododake
 
 **Bitcoin (BTC):**
 `bc1qnpqpfq7e8pjtlqj7aa6x2y2c9ctnpts5u9lx7v`

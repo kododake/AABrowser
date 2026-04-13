@@ -19,12 +19,15 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.net.toUri
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.model.UserAgentProfile
 
 data class BrowserCallbacks(
     val onUrlChange: (String) -> Unit = {},
     val onTitleChange: (String?) -> Unit = {},
+    val onFaviconReceived: (String, Bitmap?) -> Unit = { _, _ -> },
     val onProgressChange: (Int) -> Unit = {},
     val onShowDownloadPrompt: (Uri) -> Unit = {},
     val onError: (Int, String?) -> Unit = { _, _ -> },
@@ -43,7 +46,8 @@ fun configureWebView(
     webView: WebView,
     callbacks: BrowserCallbacks = BrowserCallbacks(),
     useDesktopMode: Boolean = false,
-    userAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
+    userAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME,
+    allowDarkPages: Boolean = false
 ) {
     with(webView) {
         setBackgroundColor(Color.TRANSPARENT)
@@ -80,6 +84,7 @@ fun configureWebView(
             }
         }
 
+        applyPageDarkening(allowDarkPages)
         applyUserAgent(userAgentProfile, useDesktopMode)
         val scale = context.resources.displayMetrics.density * 100
         setInitialScale(scale.toInt())
@@ -206,6 +211,12 @@ fun configureWebView(
                 callbacks.onTitleChange(title)
             }
 
+            override fun onReceivedIcon(view: WebView?, icon: Bitmap?) {
+                super.onReceivedIcon(view, icon)
+                val pageUrl = view?.url?.takeIf { it.isNotBlank() } ?: return
+                callbacks.onFaviconReceived(pageUrl, icon)
+            }
+
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                 if (view != null && callback != null) {
                     callbacks.onEnterFullscreen(view, callback)
@@ -304,6 +315,11 @@ fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) 
     reload()
 }
 
+fun WebView.updatePageDarkening(enabled: Boolean) {
+    applyPageDarkening(enabled)
+    reload()
+}
+
 fun WebView.releaseCompletely() {
     stopLoading()
     webChromeClient = WebChromeClient()
@@ -316,6 +332,12 @@ private fun WebView.applyUserAgent(profile: UserAgentProfile, desktop: Boolean) 
     settings.userAgentString = buildUserAgent(profile, desktop)
     settings.useWideViewPort = desktop
     settings.loadWithOverviewMode = desktop
+}
+
+private fun WebView.applyPageDarkening(enabled: Boolean) {
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+        WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, enabled)
+    }
 }
 
 private fun buildUserAgent(profile: UserAgentProfile, desktop: Boolean): String {
