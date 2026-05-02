@@ -14,11 +14,14 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.kododake.aabrowser"
-        minSdk = 35
-        targetSdk = 36
-        versionCode = 7
-        versionName = "2.0"
+    applicationId = "com.kododake.aabrowser"
+    minSdk = 35 -> to whatever number for android 9
+    targetSdk = 36
+    versionCode = 7
+    versionName = "2.0"
+
+    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+}`
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
