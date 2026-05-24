@@ -19,6 +19,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.net.toUri
+import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.R
@@ -85,9 +86,7 @@ fun configureWebView(
         }
 
         applyPageDarkening(allowDarkPages)
-        applyUserAgent(userAgentProfile, useDesktopMode)
-        val scale = context.resources.displayMetrics.density * 100
-        setInitialScale(scale.toInt())
+        applyBrowserIdentity(userAgentProfile, useDesktopMode)
 
         CookieManager.getInstance().also {
             it.setAcceptCookie(true)
@@ -306,12 +305,12 @@ private fun handleCleartextIfNeeded(view: WebView, uri: Uri?, callbacks: Browser
 }
 
 fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
-    applyUserAgent(profile, enable)
+    applyBrowserIdentity(profile, enable)
     reload()
 }
 
 fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
-    applyUserAgent(profile, desktop)
+    applyBrowserIdentity(profile, desktop)
     reload()
 }
 
@@ -327,11 +326,27 @@ fun WebView.releaseCompletely() {
     destroy()
 }
 
-private fun WebView.applyUserAgent(profile: UserAgentProfile, desktop: Boolean) {
+private fun WebView.applyBrowserIdentity(profile: UserAgentProfile, desktop: Boolean) {
     setTag(R.id.webview_user_agent_profile_tag, profile.storageKey)
     settings.userAgentString = buildUserAgent(profile, desktop)
     settings.useWideViewPort = desktop
     settings.loadWithOverviewMode = desktop
+    setInitialScale(if (desktop) DESKTOP_INITIAL_SCALE_PERCENT else mobileInitialScalePercent())
+    applyUserAgentMetadata(profile, desktop)
+}
+
+private fun WebView.mobileInitialScalePercent(): Int {
+    return (context.resources.displayMetrics.density * 100).toInt()
+}
+
+private fun WebView.applyUserAgentMetadata(profile: UserAgentProfile, desktop: Boolean) {
+    if (!WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) return
+
+    val metadata = when (profile) {
+        UserAgentProfile.ANDROID_CHROME -> buildChromeUserAgentMetadata(desktop)
+        UserAgentProfile.SAFARI -> buildSafariLikeUserAgentMetadata(desktop)
+    }
+    WebSettingsCompat.setUserAgentMetadata(settings, metadata)
 }
 
 private fun WebView.applyPageDarkening(enabled: Boolean) {
@@ -347,7 +362,55 @@ private fun buildUserAgent(profile: UserAgentProfile, desktop: Boolean): String 
     }
 }
 
+private fun buildChromeUserAgentMetadata(desktop: Boolean): UserAgentMetadata {
+    return UserAgentMetadata.Builder()
+        .setBrandVersionList(chromeBrandVersions())
+        .setFullVersion(CHROME_VERSION)
+        .setPlatform(if (desktop) "Windows" else "Android")
+        .setPlatformVersion(if (desktop) WINDOWS_PLATFORM_VERSION else ANDROID_PLATFORM_VERSION)
+        .setArchitecture(if (desktop) "x86" else "")
+        .setModel("")
+        .setMobile(!desktop)
+        .setBitness(if (desktop) DESKTOP_BITNESS else UserAgentMetadata.BITNESS_DEFAULT)
+        .setWow64(false)
+        .build()
+}
+
+private fun buildSafariLikeUserAgentMetadata(desktop: Boolean): UserAgentMetadata {
+    return UserAgentMetadata.Builder()
+        .setPlatform(if (desktop) "macOS" else "iOS")
+        .setPlatformVersion(if (desktop) MACOS_PLATFORM_VERSION else IOS_PLATFORM_VERSION)
+        .setArchitecture(if (desktop) "arm" else "")
+        .setModel("")
+        .setMobile(!desktop)
+        .setBitness(if (desktop) DESKTOP_BITNESS else UserAgentMetadata.BITNESS_DEFAULT)
+        .setWow64(false)
+        .build()
+}
+
+private fun chromeBrandVersions(): List<UserAgentMetadata.BrandVersion> {
+    val majorVersion = CHROME_VERSION.substringBefore('.')
+    return listOf(
+        UserAgentMetadata.BrandVersion.Builder()
+            .setBrand("Chromium")
+            .setMajorVersion(majorVersion)
+            .setFullVersion(CHROME_VERSION)
+            .build(),
+        UserAgentMetadata.BrandVersion.Builder()
+            .setBrand("Google Chrome")
+            .setMajorVersion(majorVersion)
+            .setFullVersion(CHROME_VERSION)
+            .build()
+    )
+}
+
+private const val DESKTOP_INITIAL_SCALE_PERCENT = 100
+private const val DESKTOP_BITNESS = 64
 private const val CHROME_VERSION = "146.0.0.0"
+private const val ANDROID_PLATFORM_VERSION = "10.0.0"
+private const val WINDOWS_PLATFORM_VERSION = "10.0.0"
+private const val MACOS_PLATFORM_VERSION = "14.0.0"
+private const val IOS_PLATFORM_VERSION = "17.0.0"
 private const val MOBILE_CHROME_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Mobile Safari/537.36"
 private const val WINDOWS_CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Safari/537.36"
 private const val SAFARI_MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
