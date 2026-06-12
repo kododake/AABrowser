@@ -4,9 +4,12 @@
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
 [<img src="https://github.com/user-attachments/assets/1551eaef-432d-4634-875c-f085870d00a1" alt="Get it on Obtainium" height="40">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.kododake.aabrowser%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkododake%2FAABrowser%22%2C%22author%22%3A%22kododake%22%2C%22name%22%3A%22AABrowser%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D)
 
-
 **The ultimate WebView browser experience for Android Auto head units.**
 Transform your "parked time" with a sleek, modern browser designed specifically for the road.
+
+> [!CAUTION]
+> **Beware of Fake Websites**
+> Fake websites impersonating AA Browser have appeared. **This GitHub repository is the ONLY official source.** To prevent malware infections and financial damage, absolutely do not trust or download from any other websites.
 
 > [!NOTE]
 > **Requires Android 15 or later**
@@ -153,13 +156,7 @@ If AA Browser makes your "car life" better, please consider a donation! As a stu
 **GitHub Sponsor:**
 https://github.com/sponsors/kododake
 
-**Bitcoin (BTC):**
-`bc1qnpqpfq7e8pjtlqj7aa6x2y2c9ctnpts5u9lx7v`
-
 *If you donate, please let me know in the Discussions! I'd love to add you to our contributor list as a token of my gratitude.*
-
-> [!CAUTION]
-> **No Exchange Transfers for Contributor Listing** > I **cannot** verify or list donations sent directly from cryptocurrency exchanges (e.g., Binance, Coinbase, etc.) because they do not support message signing. To be listed, please send from a wallet where you control the private keys.
 
 ---
 **Stay safe, keep your eyes on the road, and happy browsing! 🚗💨**
