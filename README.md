@@ -140,13 +140,6 @@ Every contribution makes AA Browser better!
 
 ---
 
-## 💖 Special Thanks
-
-- **[jdrch](https://github.com/jdrch):** For suggesting **Obtainium**—a brilliant idea for seamless updates!
-- **[Obtainium](https://github.com/ImranR98/Obtainium):** For being an amazing bridge between devs and users.
-
----
-
 ## 🛡️ Privacy, Reimagined
 I care about the app's growth, but I care about your privacy even more. This app is designed with a **Transparency-First** policy:
 
