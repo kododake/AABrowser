@@ -45,6 +45,7 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 - 🔎 **Global Display Scale:** Adjust the full UI and page-content scale together with presets or a custom percentage.
 - 🔄 **Smart Desktop Mode:** Seamlessly toggle between mobile and desktop rendering.
 - 📚 **Dashboard Bookmarks:** Quick access to your favorite sites without touching your phone.
+- 🛡️ **Ad &amp; Tracker Blocker:** Built-in blocking that drops ad/tracker network requests across sites, hides leftover ad boxes, and auto-skips YouTube video ads. Powered by an auto-updating [AdGuard](https://github.com/AdguardTeam/AdGuardSDNSFilter) filter list (refreshed weekly), with a hard-coded core list as a fallback. Toggle it anytime under **Settings → Privacy &amp; Ads**.
 
 
 ### 📸 Screenshots
@@ -86,8 +87,8 @@ If the app fails to launch, try opening a non-Google Maps navigation app (such a
 
 ## ⚠️ Current Issues
 
-- 🚫 **No Ad Blocking:** Ad filtering is not currently implemented (contributions welcome!).
-- 🚗 **Stationary Use Only**
+- 🛡️ **Ad Blocking (Beta):** Network + cosmetic ad/tracker blocking and YouTube ad-skipping are now built in. Server-stitched (SSAI) ads can still slip through, and the YouTube skip logic may need updates as YouTube changes — contributions welcome!
+- 🚗 **Stationary Use Only:** This is an honor-system request, **not an enforced limit**. The app does **not** detect vehicle motion or speed and will **not** automatically stop content while driving — please use it only as a passenger or when parked.
 
 ---
 
@@ -150,6 +151,7 @@ I care about the app's growth, but I care about your privacy even more. This app
 > - 🚫 **No URL Tracking:** I don't (and physically can't) see which websites you visit, what you search, or what you type.
 > - 🕵️ **Self-Hosted Analytics:** I use a private **Umami** instance. No IP track, No Google, No Meta, no Big Tech trackers.
 > - 🆔 **Anonymous Data:** I only see **"The app was opened"** and **This App Versions**. I use a random, anonymous UUID that isn't tied to your device ID or personal info.
+> - 🛡️ **Ad Blocker Updates:** With the ad blocker on, the app downloads a public ad-domain filter list (from AdGuard's open GitHub repo) about **once a week** to stay current. This is an anonymous file download — no browsing data is ever sent — and it stops entirely if you turn the ad blocker off.
 
 ---
 
