@@ -49,9 +49,9 @@ object AdBlocker {
         val appContext = context.applicationContext
         enabled = BrowserPreferences.isAdBlockEnabled(context)
         if (loaded) {
-            // Already initialised this process; just check if the remote list
-            // is due for a refresh (cheap, internally rate-limited).
-            FilterListUpdater.maybeUpdate(appContext)
+            // Already initialised this process; only touch the network when the
+            // blocker is on (matches the README: downloads stop when disabled).
+            if (enabled) FilterListUpdater.maybeUpdate(appContext)
             return
         }
         synchronized(this) {
@@ -63,10 +63,10 @@ object AdBlocker {
         }
         Thread {
             // 1) bundled asset, 2) cached AdGuard list from a previous fetch,
-            // 3) trigger a network refresh if the cache is missing/stale.
+            // 3) trigger a network refresh only if the blocker is enabled.
             runCatching { loadHostsFromAsset(appContext) }
             runCatching { FilterListUpdater.loadCached(appContext) }
-            FilterListUpdater.maybeUpdate(appContext)
+            if (enabled) FilterListUpdater.maybeUpdate(appContext)
         }.apply { isDaemon = true }.start()
     }
 
@@ -75,6 +75,8 @@ object AdBlocker {
     fun setEnabled(context: Context, value: Boolean) {
         enabled = value
         BrowserPreferences.setAdBlockEnabled(context, value)
+        // When the user turns the blocker on, refresh the remote list if due.
+        if (value) FilterListUpdater.maybeUpdate(context.applicationContext)
     }
 
     /** How many distinct hosts are currently in the blocklist. */
@@ -137,13 +139,20 @@ object AdBlocker {
     }
 
     /**
-     * Parse a filter list (hosts or AdGuard/ABP syntax) directly into the live
-     * blocklist. Returns the number of hosts added. Used by [FilterListUpdater]
-     * for the cached + freshly downloaded AdGuard list.
+     * Parse a filter list (hosts or AdGuard/ABP syntax) into a fresh set WITHOUT
+     * touching the live blocklist. Used by [FilterListUpdater] so a download can
+     * be validated (and committed to cache) before its hosts ever go live.
      */
-    fun ingest(reader: BufferedReader): Int {
+    fun parse(reader: BufferedReader): Set<String> {
+        val result = HashSet<String>()
+        parseInto(reader, result)
+        return result
+    }
+
+    /** Merge already-parsed hosts into the live blocklist. Returns added count. */
+    fun addHosts(hosts: Collection<String>): Int {
         val before = blockedHosts.size
-        parseInto(reader, blockedHosts)
+        blockedHosts.addAll(hosts)
         return blockedHosts.size - before
     }
 

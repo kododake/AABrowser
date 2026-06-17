@@ -62,7 +62,8 @@ object FilterListUpdater {
         val file = cacheFile(context)
         if (!file.exists() || file.length() == 0L) return
         runCatching {
-            file.bufferedReader().use { AdBlocker.ingest(it) }
+            val hosts = file.bufferedReader().use { AdBlocker.parse(it) }
+            AdBlocker.addHosts(hosts)
         }.onFailure { Log.w(TAG, "Failed to load cached filter list: ${it.message}") }
     }
 
@@ -124,12 +125,14 @@ object FilterListUpdater {
                 }
             }
 
-            // Validate by parsing the temp file before committing it.
-            val added = runCatching {
-                tmp.bufferedReader().use { AdBlocker.ingest(it) }
-            }.getOrDefault(0)
+            // Validate by parsing into a temporary set — without mutating the
+            // live blocklist yet, so a failed commit can't leave half-applied
+            // hosts in memory.
+            val parsed = runCatching {
+                tmp.bufferedReader().use { AdBlocker.parse(it) }
+            }.getOrDefault(emptySet())
 
-            if (added <= 0) {
+            if (parsed.isEmpty()) {
                 Log.w(TAG, "Downloaded filter list produced no usable hosts; keeping previous cache")
                 tmp.delete()
                 return
@@ -143,6 +146,8 @@ object FilterListUpdater {
                 runCatching { tmp.copyTo(dest, overwrite = true); tmp.delete(); true }
                     .getOrDefault(false)
             if (committed) {
+                // Only now make the new hosts live, after the cache is persisted.
+                val added = AdBlocker.addHosts(parsed)
                 prefs.edit().putLong(KEY_LAST_UPDATE, System.currentTimeMillis()).apply()
                 Log.i(TAG, "Filter list updated: +$added hosts (total ${AdBlocker.blockedHostCount()})")
             } else {

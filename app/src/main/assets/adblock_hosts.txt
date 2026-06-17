@@ -155,7 +155,6 @@ heapanalytics.com
 clicktale.net
 inspectlet.com
 luckyorange.com
-yandex.ru/metrika
 mc.yandex.ru
 matomo.cloud
 statcounter.com
@@ -225,7 +224,6 @@ omnitagjs.com
 imrworldwide.com
 turn.com
 simpli.fi
-districtm.io
 ipredictive.com
 adingo.jp
 ad-stir.com
