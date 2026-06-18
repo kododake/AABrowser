@@ -7,6 +7,7 @@ import android.util.Patterns
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.kododake.aabrowser.data.BrowserPreferences
+import com.kododake.aabrowser.navigation.UrlSafetyCoordinator
 
 class ShareBookmarkActivity : AppCompatActivity() {
 
@@ -30,7 +31,21 @@ class ShareBookmarkActivity : AppCompatActivity() {
             return
         }
 
-        if (BrowserPreferences.addBookmark(this, url)) {
+        val normalized = UrlSafetyCoordinator.normalizeBookmarkKey(url)
+        val existing = BrowserPreferences.getBookmarks(this)
+        if (existing.any { UrlSafetyCoordinator.bookmarksReferToSamePage(it, normalized) }) {
+            Toast.makeText(this, R.string.bookmark_exists, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val batchUrls = extractSharedUrlBatch(intent)
+        if (batchUrls.size > 1) {
+            BrowserPreferences.setBookmarks(this, UrlSafetyCoordinator.mergeBookmarkLists(existing, batchUrls))
+            Toast.makeText(this, getString(R.string.bookmark_added), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (BrowserPreferences.addBookmark(this, normalized)) {
             Toast.makeText(this, R.string.bookmark_added, Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, R.string.bookmark_exists, Toast.LENGTH_SHORT).show()
@@ -67,5 +82,26 @@ class ShareBookmarkActivity : AppCompatActivity() {
             }
         }
         return null
+    }
+
+    private fun extractSharedUrlBatch(intent: Intent?): List<String> {
+        if (intent == null || intent.action != Intent.ACTION_SEND) {
+            return emptyList()
+        }
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+        if (text.isBlank()) {
+            return emptyList()
+        }
+        val urls = mutableListOf<String>()
+        val matcher = Patterns.WEB_URL.matcher(text)
+        while (matcher.find()) {
+            val candidate = matcher.group().trim()
+            val parsed = runCatching { Uri.parse(candidate) }.getOrNull() ?: continue
+            val scheme = parsed.scheme?.lowercase()
+            if (scheme == "http" || scheme == "https") {
+                urls.add(UrlSafetyCoordinator.normalizeBookmarkKey(candidate))
+            }
+        }
+        return urls.distinct()
     }
 }

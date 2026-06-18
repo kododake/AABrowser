@@ -10,6 +10,7 @@ import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.data.SiteIconCache
 import com.kododake.aabrowser.databinding.ActivityMainBinding
+import com.kododake.aabrowser.navigation.UrlSafetyCoordinator
 import com.kododake.aabrowser.ui.adapters.BookmarkAdapter
 
 class BookmarkManager(
@@ -88,7 +89,15 @@ class BookmarkManager(
             return
         }
         
-        if (BrowserPreferences.addBookmark(activity, url)) {
+        val normalizedUrl = UrlSafetyCoordinator.normalizeBookmarkKey(url)
+        val existing = BrowserPreferences.getBookmarks(activity)
+        val alreadyStored = existing.any { UrlSafetyCoordinator.bookmarksReferToSamePage(it, normalizedUrl) }
+        if (alreadyStored) {
+            val message = activity.getString(R.string.bookmark_exists)
+            Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (BrowserPreferences.addBookmark(activity, normalizedUrl)) {
             val message = activity.getString(R.string.bookmark_added)
             Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
             refreshBookmarks()
