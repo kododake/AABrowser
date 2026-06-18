@@ -67,7 +67,9 @@ class NavigationManager(
         if (targetTab == null) {
             return
         }
-        
+
+        UrlSafetyCoordinator.resetRedirectChain(targetTab.id)
+
         val targetWebView = targetTab.webView
         val uri = runCatching { Uri.parse(navigable) }.getOrNull()
         if (uri == null) {
@@ -102,7 +104,15 @@ class NavigationManager(
 
         val scheme = uri.scheme?.lowercase()
         val host = uri.host?.lowercase()
-        
+
+        if (UrlSafetyCoordinator.shouldBypassCleartextPrompt(navigable)) {
+            UrlSafetyCoordinator.registerSessionTrustedHost(host)
+            finishNavigation {
+                targetWebView.loadUrl(navigable)
+            }
+            return
+        }
+
         if (scheme == "http" && !BrowserPreferences.isHostAllowedCleartext(activity, host)) {
             permissionManager.showCleartextNavigationDialog(
                 uri = uri,

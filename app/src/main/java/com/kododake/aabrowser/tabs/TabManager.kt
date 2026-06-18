@@ -17,6 +17,7 @@ import com.kododake.aabrowser.ui.adapters.TabAdapter
 import com.kododake.aabrowser.web.BrowserCallbacks
 import com.kododake.aabrowser.web.configureWebView
 import com.kododake.aabrowser.web.releaseCompletely
+import com.kododake.aabrowser.navigation.UrlSafetyCoordinator
 import com.kododake.aabrowser.web.updateDesktopMode
 
 data class BrowserTab(
@@ -298,6 +299,27 @@ class TabManager(
         val entries = browserTabs.map { BrowserPreferences.TabSessionEntry(it.currentUrl.takeIf { u -> u.isNotBlank() }, it.currentTitle.takeIf { t -> t.isNotBlank() }) }
         val activeIndex = browserTabs.indexOfFirst { it.id == activeTabId }.coerceAtLeast(0)
         BrowserPreferences.persistTabSession(activity, entries, activeIndex)
+    }
+
+    fun followRedirectForActiveTab(nextLocation: String): Boolean {
+        val tab = activeTab ?: return false
+        val decision = UrlSafetyCoordinator.recordRedirectHop(tab.id, tab.currentUrl, nextLocation)
+        return when (decision) {
+            is UrlSafetyCoordinator.RedirectDecision.Allowed -> {
+                tab.currentUrl = decision.url
+                tab.webView.loadUrl(decision.url)
+                true
+            }
+            is UrlSafetyCoordinator.RedirectDecision.Blocked -> false
+        }
+    }
+
+    fun importSharedBookmarkBatch(urls: List<String>): Int {
+        val current = BrowserPreferences.getBookmarks(activity)
+        val merged = UrlSafetyCoordinator.mergeBookmarkLists(current, urls)
+        BrowserPreferences.setBookmarks(activity, merged)
+        refreshTabs()
+        return merged.size - current.size
     }
 
     fun refreshTabs() {
