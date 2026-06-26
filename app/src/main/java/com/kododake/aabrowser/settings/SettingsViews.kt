@@ -35,6 +35,7 @@ import com.google.zxing.common.BitMatrix
 import com.google.zxing.qrcode.QRCodeWriter
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
+import com.kododake.aabrowser.web.AdBlocker
 import com.kododake.aabrowser.model.AppThemeMode
 import com.kododake.aabrowser.model.QuickActionButtonMode
 import com.kododake.aabrowser.model.QuickActionButtonPosition
@@ -625,6 +626,32 @@ object SettingsViews {
 
         startupCard.addView(startupInner)
         container.addView(startupCard)
+
+        val privacyCard = createStyledCard()
+        val privacyInner = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(16), dp(8), dp(16))
+        }
+        privacyInner.addView(
+            createSectionTitle(
+                context.getString(R.string.settings_privacy),
+                R.drawable.security_24px,
+                bottomPaddingDp = 8
+            )
+        )
+
+        val adBlockRow = createSettingSwitchRow(
+            title = context.getString(R.string.settings_ad_block),
+            description = context.getString(R.string.settings_ad_block_description),
+            iconRes = R.drawable.security_24px,
+            isCheckedValue = BrowserPreferences.isAdBlockEnabled(context)
+        ) { isChecked ->
+            AdBlocker.setEnabled(context, isChecked)
+        }
+        privacyInner.addView(adBlockRow)
+
+        privacyCard.addView(privacyInner)
+        container.addView(privacyCard)
 
         val inAppControlsCard = createStyledCard()
         val inAppControlsInner = LinearLayout(context).apply {

@@ -51,6 +51,8 @@ fun configureWebView(
     userAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME,
     allowDarkPages: Boolean = false
 ) {
+    AdBlocker.init(webView.context)
+
     with(webView) {
         setBackgroundColor(Color.TRANSPARENT)
 
@@ -97,6 +99,16 @@ fun configureWebView(
         //setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                if (AdBlocker.shouldBlock(request.url?.toString())) {
+                    return AdBlocker.blockedResponse()
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
                 if (handleCleartextIfNeeded(view, uri, callbacks, onPageStart = false)) {
@@ -138,6 +150,12 @@ fun configureWebView(
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
                 view.evaluateJavascript(SpeechRecognitionBridge.POLYFILL_JS, null)
+                if (AdBlocker.isEnabled()) {
+                    view.evaluateJavascript(AdBlocker.COSMETIC_JS, null)
+                    if (AdBlocker.isYouTube(url)) {
+                        view.evaluateJavascript(AdBlocker.YOUTUBE_AD_SKIP_JS, null)
+                    }
+                }
                 url?.let(callbacks.onUrlChange)
             }
 

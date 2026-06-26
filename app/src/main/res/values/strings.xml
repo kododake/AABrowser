@@ -103,6 +103,9 @@
     <string name="settings_resume_last_page_on_launch">Resume last page on launch</string>
     <string name="settings_resume_last_page_on_launch_description">When no home page is set, open the last page you visited instead of the start page.</string>
     <string name="settings_resume_last_page_home_override">Home page currently overrides last-page resume.</string>
+    <string name="settings_privacy">Privacy &amp; Ads</string>
+    <string name="settings_ad_block">Block ads &amp; trackers</string>
+    <string name="settings_ad_block_description">Blocks ads and trackers across sites using an auto-updating AdGuard filter list, and auto-skips YouTube video ads. Some ads (especially server-inserted ones) may still slip through.</string>
     <string name="settings_in_app_controls">In-app controls</string>
     <string name="settings_in_app_controls_description">Configure the floating button and choose whether the address bar stays visible while browsing.</string>
     <string name="settings_always_show_url_bar">Always show URL bar</string>
