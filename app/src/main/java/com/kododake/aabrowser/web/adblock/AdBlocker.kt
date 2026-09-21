@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong
 object AdBlocker {
     private const val FILTERS_ASSET = "adblock/blocklist.txt"
     private const val CACHE_MAGIC = 0x41414246
-    private const val CACHE_VERSION = 2
+    private const val CACHE_VERSION = 3
     private const val MAX_BRIDGE_TOKENS = 512
     private const val MAX_CACHE_BYTES = 256L * 1024 * 1024
 
@@ -186,8 +186,14 @@ object AdBlocker {
         }
     }
 
-    fun scriptletInvocations(pageUrl: String?): List<FilterEngine.ScriptletInvocation> =
-        engine.scriptletsFor(pageUrl)
+    fun scriptletInvocations(pageUrl: String?): List<FilterEngine.ScriptletInvocation> {
+        val current = engine
+        if (current.pagePolicy(pageUrl).document) return emptyList()
+        return current.scriptletsFor(pageUrl)
+    }
+
+    /** Content exceptions that apply to the page at [pageUrl]. */
+    fun pagePolicy(pageUrl: String?): FilterEngine.PagePolicy = engine.pagePolicy(pageUrl)
 
     fun interceptOrNull(
         requestUrl: Uri?,
@@ -199,7 +205,9 @@ object AdBlocker {
         if (isMainFrame || requestUrl == null) return null
         val scheme = requestUrl.scheme?.lowercase(Locale.ROOT)
         if (scheme != "http" && scheme != "https") return null
-        if (!engine.shouldBlock(FilterEngine.Request(
+        val current = engine
+        if (pageUrl != null && current.pagePolicy(pageUrl).document) return null
+        if (!current.shouldBlock(FilterEngine.Request(
                 url = requestUrl.toString(),
                 pageUrl = pageUrl,
                 resourceType = inferResourceType(requestUrl, requestHeaders),
@@ -217,7 +225,10 @@ object AdBlocker {
      * should be requested; an empty string when nothing applies to [pageUrl].
      */
     fun cosmeticInitJson(pageUrl: String?): String {
-        val init = engine.cosmeticInit(pageUrl) ?: return ""
+        val current = engine
+        val policy = current.pagePolicy(pageUrl)
+        if (policy.hidesNothing) return ""
+        val init = current.cosmeticInit(pageUrl, allowGeneric = policy.allowGeneric, allowSpecific = policy.allowSpecific) ?: return ""
         return org.json.JSONObject()
             .put("s", org.json.JSONArray(init.specific))
             .put("o", org.json.JSONArray(init.other))
@@ -234,7 +245,9 @@ object AdBlocker {
         val classes = parseTokenArray(classesJson)
         val ids = parseTokenArray(idsJson)
         if (classes.isEmpty() && ids.isEmpty()) return ""
-        val selectors = engine.genericSelectorsFor(classes, ids, host)
+        val current = engine
+        if (!current.pagePolicy(pageUrl).allowGeneric) return ""
+        val selectors = current.genericSelectorsFor(classes, ids, host)
         return if (selectors.isEmpty()) "" else org.json.JSONArray(selectors).toString()
     }
 

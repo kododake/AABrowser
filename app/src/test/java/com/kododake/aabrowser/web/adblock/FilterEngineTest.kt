@@ -310,6 +310,99 @@ class FilterEngineTest {
         assertTrue(invocation.name == "trusted-set-constant")
     }
 
+    @Test
+    fun `important blocking rules override plain exceptions`() {
+        val engine = engine("||ads.test^${'$'}important", "@@||ads.test/allowed.js")
+        assertTrue(engine.blocks("https://ads.test/allowed.js"))
+        assertTrue(engine.blocks("https://ads.test/other.js"))
+
+        val plain = engine("||ads.test^", "@@||ads.test/allowed.js")
+        assertFalse(plain.blocks("https://ads.test/allowed.js"))
+    }
+
+    @Test
+    fun `important exceptions override important blocking rules`() {
+        val engine = engine("||ads.test^${'$'}important", "@@||ads.test/allowed.js${'$'}important")
+        assertFalse(engine.blocks("https://ads.test/allowed.js"))
+        assertTrue(engine.blocks("https://ads.test/other.js"))
+    }
+
+    @Test
+    fun `important survives the compiled snapshot`() {
+        val original = engine("||ads.test^${'$'}important", "@@||ads.test^", "@@||site.test^${'$'}generichide,script")
+        val bytes = ByteArrayOutputStream().also { buffer -> DataOutputStream(buffer).use(original::writeSnapshot) }.toByteArray()
+        val restored = DataInputStream(ByteArrayInputStream(bytes)).use(FilterEngine::readSnapshot)
+        assertTrue(restored.blocks("https://ads.test/x.js"))
+        assertTrue(restored.pagePolicy("https://site.test/").generichide)
+    }
+
+    @Test
+    fun `popup ping and websocket options stay inert instead of dropping the rule`() {
+        val engine = engine("||tracker.test^${'$'}ping", "||popups.test^${'$'}popup", "||sock.test^${'$'}websocket", "||mixed.test^${'$'}ping,script")
+        assertFalse(engine.blocks("https://tracker.test/beacon", type = FilterEngine.ResourceType.OTHER))
+        assertFalse(engine.blocks("https://popups.test/", type = FilterEngine.ResourceType.SUBDOCUMENT))
+        assertFalse(engine.blocks("https://sock.test/ws", type = FilterEngine.ResourceType.XHR))
+        assertTrue(engine.blocks("https://mixed.test/a.js", type = FilterEngine.ResourceType.SCRIPT))
+        assertFalse(engine.blocks("https://mixed.test/a.png", type = FilterEngine.ResourceType.IMAGE))
+        assertTrue(engine("||ads.test^${'$'}~popup").blocks("https://ads.test/a.js", type = FilterEngine.ResourceType.SCRIPT))
+        assertTrue(engine("||ads.test^${'$'}empty").blocks("https://ads.test/a.js"))
+        assertTrue(engine("||ads.test^${'$'}from=news.test").blocks("https://ads.test/a.js", "https://news.test"))
+        assertFalse(engine("||ads.test^${'$'}from=news.test").blocks("https://ads.test/a.js", "https://other.test"))
+    }
+
+    @Test
+    fun `document exception disables blocking and cosmetics for the page but not elsewhere`() {
+        val engine = engine("||ads.test^", "@@||trusted.test^${'$'}document", "trusted.test##.promo", "##.ad-banner")
+        val policy = engine.pagePolicy("https://trusted.test/page")
+        assertTrue(policy.document && policy.elemhide && policy.generichide && policy.specifichide)
+        assertTrue(engine.pagePolicy("https://sub.trusted.test/") == policy)
+        assertTrue(engine.pagePolicy("https://other.test/") == FilterEngine.PagePolicy.DEFAULT)
+        assertTrue(engine.pagePolicy("https://nottrusted.test/") == FilterEngine.PagePolicy.DEFAULT)
+        assertTrue(engine.pagePolicy(null) == FilterEngine.PagePolicy.DEFAULT)
+        // The $document exception is not a subresource exception: the engine still reports the
+        // match, the adapter is what skips the page (see AdBlocker.interceptOrNull).
+        assertTrue(engine.blocks("https://ads.test/a.js", "https://trusted.test/page"))
+    }
+
+    @Test
+    fun `generichide and specifichide exceptions are reported separately`() {
+        val engine = engine("@@||news.test^${'$'}generichide", "@@||shop.test^${'$'}shide", "@@||both.test^${'$'}ehide")
+        val news = engine.pagePolicy("https://news.test/")
+        assertTrue(news.generichide && !news.specifichide && !news.document && !news.elemhide)
+        assertTrue(news.allowSpecific && !news.allowGeneric)
+        val shop = engine.pagePolicy("https://shop.test/")
+        assertTrue(shop.specifichide && !shop.generichide)
+        val both = engine.pagePolicy("https://both.test/")
+        assertTrue(both.hidesNothing && !both.allowGeneric && !both.allowSpecific)
+    }
+
+    @Test
+    fun `content options on blocking rules drop the rule and mixed exceptions keep both halves`() {
+        assertFalse(engine("||ads.test^${'$'}document").blocks("https://ads.test/a.js"))
+        val mixed = engine("||cdn.test^", "@@||cdn.test^${'$'}generichide,script")
+        assertFalse(mixed.blocks("https://cdn.test/a.js", type = FilterEngine.ResourceType.SCRIPT))
+        assertTrue(mixed.blocks("https://cdn.test/a.png", type = FilterEngine.ResourceType.IMAGE))
+        assertTrue(mixed.pagePolicy("https://cdn.test/").generichide)
+    }
+
+    @Test
+    fun `unknown page context blocks only unconditional rules and honours exceptions leniently`() {
+        val engine = engine(
+            "||ads.test^",
+            "||party.test^${'$'}third-party",
+            "||scoped.test^${'$'}domain=news.test",
+            "||allowed.test^",
+            "@@||allowed.test^${'$'}domain=news.test"
+        )
+        fun blocked(url: String, lenient: Boolean) = engine.shouldBlock(FilterEngine.Request(url, null), lenientExceptions = lenient)
+        assertTrue(blocked("https://ads.test/a.js", lenient = true))
+        assertFalse(blocked("https://party.test/a.js", lenient = true))
+        assertFalse(blocked("https://scoped.test/a.js", lenient = true))
+        assertFalse(blocked("https://allowed.test/a.js", lenient = true))
+        assertTrue(blocked("https://allowed.test/a.js", lenient = false))
+        assertTrue(engine.blocks("https://party.test/a.js", "https://news.test"))
+    }
+
     private fun engine(vararg rules: String) = FilterEngine.parse(rules.asSequence())
 
     /** Every selector the document-start script would hide on [url] given the page's [classes]/[ids]. */

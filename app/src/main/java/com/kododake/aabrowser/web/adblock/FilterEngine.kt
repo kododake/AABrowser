@@ -12,10 +12,12 @@ class FilterEngine private constructor(
     private val cosmeticRules: List<CosmeticRule>,
     private val scriptletRules: List<ScriptletRule>
 ) {
-    private val indexedBlockingRules: Map<String, List<NetworkRule>>
-    private val unindexedBlockingRules: List<NetworkRule>
-    private val indexedExceptionRules: Map<String, List<NetworkRule>>
-    private val unindexedExceptionRules: List<NetworkRule>
+    private val blocking: Bucket
+    private val exceptions: Bucket
+    private val importantBlocking: Bucket
+    private val importantExceptions: Bucket
+    /** `@@` rules carrying $document / $elemhide / $generichide / $specifichide; see [pagePolicy]. */
+    private val contentExceptions: Bucket
     private val cosmeticRulesByDomain: Map<String, List<CosmeticRule>>
     private val entityCosmeticRules: List<CosmeticRule>
     /** Generic (domain-less) hide rules keyed by the class or id their leading compound selector requires. */
@@ -30,20 +32,22 @@ class FilterEngine private constructor(
     private val entityScriptletRules: List<ScriptletRule>
 
     init {
-        val blocking = HashMap<String, MutableList<NetworkRule>>()
-        val blockingUnindexed = ArrayList<NetworkRule>()
-        val exceptions = HashMap<String, MutableList<NetworkRule>>()
-        val exceptionsUnindexed = ArrayList<NetworkRule>()
+        val builders = Array(5) { BucketBuilder() }
         networkRules.forEach { rule ->
-            val targetIndex = if (rule.exception) exceptions else blocking
-            val targetUnindexed = if (rule.exception) exceptionsUnindexed else blockingUnindexed
-            if (rule.token == null) targetUnindexed += rule
-            else targetIndex.getOrPut(rule.token) { ArrayList() } += rule
+            val target = when {
+                rule.contentFlags != 0 -> 4
+                rule.exception && rule.important -> 3
+                rule.exception -> 1
+                rule.important -> 2
+                else -> 0
+            }
+            builders[target].add(rule)
         }
-        indexedBlockingRules = blocking
-        unindexedBlockingRules = blockingUnindexed
-        indexedExceptionRules = exceptions
-        unindexedExceptionRules = exceptionsUnindexed
+        blocking = builders[0].build()
+        exceptions = builders[1].build()
+        importantBlocking = builders[2].build()
+        importantExceptions = builders[3].build()
+        contentExceptions = builders[4].build()
 
         val cosmeticByDomain = HashMap<String, MutableList<CosmeticRule>>()
         val entityCosmetic = ArrayList<CosmeticRule>()
@@ -94,7 +98,28 @@ class FilterEngine private constructor(
         entityScriptletRules = entityScriptlets
     }
 
-    enum class ResourceType { SCRIPT, IMAGE, STYLESHEET, FONT, MEDIA, XHR, SUBDOCUMENT, OTHER }
+    /** Append-only: ordinals are stored in compiled snapshots. */
+    enum class ResourceType { SCRIPT, IMAGE, STYLESHEET, FONT, MEDIA, XHR, SUBDOCUMENT, OTHER, PING, WEBSOCKET, POPUP, DOCUMENT }
+
+    /**
+     * What `@@` content exceptions say about a page: [document] disables blocking and all cosmetic
+     * filtering on it; [elemhide] disables all element hiding; [generichide] only the generic
+     * (domain-less) hide rules; [specifichide] only the site-specific ones.
+     */
+    data class PagePolicy(
+        val document: Boolean = false,
+        val elemhide: Boolean = false,
+        val generichide: Boolean = false,
+        val specifichide: Boolean = false
+    ) {
+        val hidesNothing: Boolean get() = document || elemhide
+        val allowGeneric: Boolean get() = !hidesNothing && !generichide
+        val allowSpecific: Boolean get() = !hidesNothing && !specifichide
+
+        companion object {
+            val DEFAULT = PagePolicy()
+        }
+    }
 
     data class Request(
         val url: String,
@@ -112,19 +137,43 @@ class FilterEngine private constructor(
         val trusted: Boolean
     )
 
-    fun shouldBlock(request: Request): Boolean {
+    /**
+     * Decides whether [request] should be blocked. `$important` blocking rules beat plain `@@`
+     * exceptions, and `@@...$important` beats everything, as in uBlock Origin.
+     *
+     * When the page that issued the request is unknown (no page URL/host, e.g. a service worker
+     * fetch) the party and `$domain=` constraints cannot be evaluated: blocking rules that depend
+     * on them do not match, and with [lenientExceptions] exception rules treat them as satisfied,
+     * so the engine errs towards not blocking.
+     */
+    fun shouldBlock(request: Request, lenientExceptions: Boolean = false): Boolean {
         val requestHost = request.requestHost?.let(::normalizeHost) ?: hostOf(request.url) ?: return false
         val pageHost = request.pageHost?.let(::normalizeHost) ?: hostOf(request.pageUrl)
-        val context = MatchContext(
-            request,
-            requestHost,
-            pageHost,
-            pageHost != null && !sameSite(requestHost, pageHost)
+        val thirdParty = pageHost?.let { !sameSite(requestHost, it) }
+        val strict = MatchContext(request, requestHost, pageHost, thirdParty, lenientUnknownPage = false)
+        val forExceptions = if (lenientExceptions && pageHost == null) strict.copy(lenientUnknownPage = true) else strict
+        if (importantExceptions.matches(request.url, forExceptions)) return false
+        if (importantBlocking.matches(request.url, strict)) return true
+        if (exceptions.matches(request.url, forExceptions)) return false
+        return blocking.matches(request.url, strict)
+    }
+
+    /** Content exceptions (`@@...$document`, `$elemhide`, `$generichide`, `$specifichide`) that apply to [pageUrl]. */
+    fun pagePolicy(pageUrl: String?): PagePolicy {
+        if (contentExceptions.isEmpty) return PagePolicy.DEFAULT
+        val host = hostOf(pageUrl) ?: return PagePolicy.DEFAULT
+        val request = Request(pageUrl!!, pageUrl, ResourceType.DOCUMENT, host, host)
+        val context = MatchContext(request, host, host, thirdParty = false, lenientUnknownPage = false)
+        var flags = 0
+        contentExceptions.forEachMatch(pageUrl, context) { flags = flags or it.contentFlags }
+        if (flags == 0) return PagePolicy.DEFAULT
+        val document = flags and FLAG_DOCUMENT != 0
+        return PagePolicy(
+            document = document,
+            elemhide = document || flags and FLAG_ELEMHIDE != 0,
+            generichide = document || flags and FLAG_GENERICHIDE != 0,
+            specifichide = document || flags and FLAG_SPECIFICHIDE != 0
         )
-        if (unindexedExceptionRules.any { it.matches(context) } ||
-            matchesIndexed(request.url, indexedExceptionRules, context)) return false
-        if (unindexedBlockingRules.any { it.matches(context) }) return true
-        return matchesIndexed(request.url, indexedBlockingRules, context)
     }
 
     /**
@@ -134,12 +183,14 @@ class FilterEngine private constructor(
      */
     data class CosmeticInit(val specific: List<String>, val other: List<String>, val generic: Boolean)
 
-    fun cosmeticInit(pageUrl: String?, allowGeneric: Boolean = true): CosmeticInit? {
+    fun cosmeticInit(pageUrl: String?, allowGeneric: Boolean = true, allowSpecific: Boolean = true): CosmeticInit? {
         val host = hostOf(pageUrl) ?: return null
         val exceptions = cosmeticExceptionsFor(host)
         val specific = LinkedHashSet<String>()
-        domainCandidates(host, emptyList(), cosmeticRulesByDomain, entityCosmeticRules).forEach { rule ->
-            if (!rule.exception && rule.appliesTo(host) && rule.selector !in exceptions) specific += rule.selector
+        if (allowSpecific) {
+            domainCandidates(host, emptyList(), cosmeticRulesByDomain, entityCosmeticRules).forEach { rule ->
+                if (!rule.exception && rule.appliesTo(host) && rule.selector !in exceptions) specific += rule.selector
+            }
         }
         val other = if (allowGeneric) {
             genericOther.asSequence()
@@ -244,6 +295,8 @@ class FilterEngine private constructor(
                 }
             }
             output.writeBoolean(rule.exception)
+            output.writeBoolean(rule.important)
+            output.writeInt(rule.contentFlags)
             output.writeNullableString(rule.token)
             output.writeByte(when (rule.thirdParty) { null -> -1; false -> 0; true -> 1 })
             output.writeResourceTypes(rule.includeTypes)
@@ -267,29 +320,6 @@ class FilterEngine private constructor(
             output.writeStringSet(rule.excludedDomains)
             output.writeBoolean(rule.trusted)
         }
-    }
-
-    private fun matchesIndexed(
-        value: String,
-        index: Map<String, List<NetworkRule>>,
-        context: MatchContext
-    ): Boolean {
-        var runStart = -1
-        var cursor = 0
-        while (cursor <= value.length) {
-            val char = value.getOrNull(cursor)
-            val tokenChar = char != null && (char.isAsciiLetterOrDigitIgnoreCase() || char == '%')
-            if (tokenChar && runStart < 0) runStart = cursor
-            if (!tokenChar && runStart >= 0) {
-                if (cursor - runStart >= 4) {
-                    val token = value.substring(runStart, cursor).lowercase(Locale.ROOT)
-                    index[token]?.forEach { if (it.matches(context)) return true }
-                }
-                runStart = -1
-            }
-            cursor++
-        }
-        return false
     }
 
     companion object {
@@ -324,6 +354,16 @@ class FilterEngine private constructor(
             ":remove-class(", ":matches-media(", ":matches-prop(", ":if(", ":if-not(", ":shadow("
         )
         private val UNHELPFUL_TOKENS = setOf("http", "https", "html", "com", "org", "net")
+        internal const val FLAG_DOCUMENT = 1
+        internal const val FLAG_ELEMHIDE = 2
+        internal const val FLAG_GENERICHIDE = 4
+        internal const val FLAG_SPECIFICHIDE = 8
+        private val CONTENT_OPTIONS = mapOf(
+            "document" to FLAG_DOCUMENT, "doc" to FLAG_DOCUMENT,
+            "elemhide" to FLAG_ELEMHIDE, "ehide" to FLAG_ELEMHIDE,
+            "generichide" to FLAG_GENERICHIDE, "ghide" to FLAG_GENERICHIDE,
+            "specifichide" to FLAG_SPECIFICHIDE, "shide" to FLAG_SPECIFICHIDE
+        )
         private val TYPE_OPTIONS = mapOf(
             "script" to ResourceType.SCRIPT, "image" to ResourceType.IMAGE,
             "stylesheet" to ResourceType.STYLESHEET, "font" to ResourceType.FONT,
@@ -331,7 +371,12 @@ class FilterEngine private constructor(
             "media" to ResourceType.MEDIA, "xmlhttprequest" to ResourceType.XHR,
             "xhr" to ResourceType.XHR, "subdocument" to ResourceType.SUBDOCUMENT,
             "frame" to ResourceType.SUBDOCUMENT, "other" to ResourceType.OTHER,
-            "object" to ResourceType.MEDIA
+            "object" to ResourceType.MEDIA,
+            // WebView never hands these request kinds to shouldInterceptRequest, so rules that
+            // only target them stay inert instead of being dropped (and `$ping,script` still
+            // blocks scripts).
+            "ping" to ResourceType.PING, "beacon" to ResourceType.PING,
+            "websocket" to ResourceType.WEBSOCKET, "popup" to ResourceType.POPUP
         )
 
         fun parse(lines: Sequence<String>): FilterEngine =
@@ -358,7 +403,11 @@ class FilterEngine private constructor(
                     network.remove(target)
                     return@forEach
                 }
-                if (line !in disabledNetworkRules) parseNetwork(line)?.let { network.putIfAbsent(line, it) }
+                if (line !in disabledNetworkRules) {
+                    parseNetwork(line).forEachIndexed { index, rule ->
+                        network.putIfAbsent(if (index == 0) line else "$line\u0000$index", rule)
+                    }
+                }
             }
             return FilterEngine(network.values.toList(), cosmetic, scriptlets)
         }
@@ -380,6 +429,8 @@ class FilterEngine private constructor(
                     else -> throw IllegalArgumentException("Unknown cached pattern type $type")
                 }
                 val exception = input.readBoolean()
+                val important = input.readBoolean()
+                val contentFlags = input.readInt()
                 val token = input.readNullableString()
                 val thirdParty = when (input.readByte().toInt()) {
                     -1 -> null
@@ -390,7 +441,8 @@ class FilterEngine private constructor(
                 network += NetworkRule(
                     pattern, "", exception, token, thirdParty,
                     input.readResourceTypes(), input.readResourceTypes(),
-                    input.readStringSet(), input.readStringSet()
+                    input.readStringSet(), input.readStringSet(),
+                    important, contentFlags
                 )
             }
             val cosmetic = ArrayList<CosmeticRule>()
@@ -590,19 +642,26 @@ class FilterEngine private constructor(
             return CosmeticRule(selector, marker == "#@#", included, excluded)
         }
 
-        private fun parseNetwork(source: String): NetworkRule? {
+        /**
+         * Parses one network filter. Usually yields one rule; an exception that combines content
+         * options (`$document`, `$generichide`, ...) with ordinary resource types yields two, one
+         * per bucket. Rules with options the engine cannot honour yield nothing.
+         */
+        private fun parseNetwork(source: String): List<NetworkRule> {
             var line = source
             hostsEntry(line)?.let { line = it }
             val exception = line.startsWith("@@")
             if (exception) line = line.drop(2)
-            if (line.isBlank() || line.startsWith("#")) return null
+            if (line.isBlank() || line.startsWith("#")) return emptyList()
             val optionAt = optionSeparator(line)
             val patternText = if (optionAt >= 0) line.substring(0, optionAt) else line
             val optionText = if (optionAt >= 0) line.substring(optionAt + 1) else ""
-            if (patternText.isBlank()) return null
+            if (patternText.isBlank()) return emptyList()
 
             var thirdParty: Boolean? = null
             var matchCase = false
+            var important = false
+            var contentFlags = 0
             val includeTypes = mutableSetOf<ResourceType>()
             val excludeTypes = mutableSetOf<ResourceType>()
             val includeDomains = mutableSetOf<String>()
@@ -617,8 +676,16 @@ class FilterEngine private constructor(
                     option == "first-party" || option == "1p" -> thirdParty = negated
                     option == "match-case" -> matchCase = !negated
                     option == "all" && !negated -> Unit
-                    option == "important" && !negated -> Unit
-                    option.startsWith("domain=") -> {
+                    option == "empty" && !negated -> Unit
+                    option == "important" && !negated -> important = true
+                    option in CONTENT_OPTIONS && !negated -> {
+                        // Only meaningful on exceptions. On a blocking rule `$document` would
+                        // mean "block navigation", which WebView interception cannot do, so
+                        // ignoring it would turn the rule into a broad subresource block.
+                        if (exception) contentFlags = contentFlags or CONTENT_OPTIONS.getValue(option)
+                        else unsupported = true
+                    }
+                    option.startsWith("domain=") || option.startsWith("from=") -> {
                         val valueStart = option.indexOf('=') + 1
                         forEachPart(option, valueStart, option.length, '|') { domainStart, domainEnd ->
                             val excluded = option[domainStart] == '~'
@@ -638,11 +705,23 @@ class FilterEngine private constructor(
             }
             // Silently ignoring an action option such as removeparam or redirect
             // would turn it into a much broader blocking rule, so skip the rule.
-            if (unsupported) return null
-            return NetworkRule(
-                compilePattern(patternText, matchCase) ?: return null, source, exception, extractToken(patternText), thirdParty,
-                includeTypes, excludeTypes, includeDomains, excludeDomains
-            )
+            if (unsupported) return emptyList()
+            val pattern = compilePattern(patternText, matchCase) ?: return emptyList()
+            val token = extractToken(patternText)
+            val rules = ArrayList<NetworkRule>(2)
+            if (contentFlags != 0) {
+                rules += NetworkRule(
+                    pattern, source, exception, token, thirdParty,
+                    emptySet(), emptySet(), includeDomains, excludeDomains, important, contentFlags
+                )
+            }
+            if (contentFlags == 0 || includeTypes.isNotEmpty()) {
+                rules += NetworkRule(
+                    pattern, source, exception, token, thirdParty,
+                    includeTypes, excludeTypes, includeDomains, excludeDomains, important, 0
+                )
+            }
+            return rules
         }
 
         private fun extractToken(pattern: String): String? {
@@ -838,12 +917,52 @@ class FilterEngine private constructor(
         }
     }
 
+    /** [thirdParty] is null when the requesting page is unknown; [lenientUnknownPage] then makes party and domain constraints count as satisfied. */
     private data class MatchContext(
         val request: Request,
         val requestHost: String,
         val pageHost: String?,
-        val thirdParty: Boolean
+        val thirdParty: Boolean?,
+        val lenientUnknownPage: Boolean
     )
+
+    /** Network rules split into token-indexed and unindexed (regex-like) groups for fast matching. */
+    private class Bucket(private val indexed: Map<String, List<NetworkRule>>, private val unindexed: List<NetworkRule>) {
+        val isEmpty: Boolean get() = indexed.isEmpty() && unindexed.isEmpty()
+
+        fun matches(url: String, context: MatchContext): Boolean {
+            forEachMatch(url, context) { return true }
+            return false
+        }
+
+        inline fun forEachMatch(url: String, context: MatchContext, action: (NetworkRule) -> Unit) {
+            unindexed.forEach { if (it.matches(context)) action(it) }
+            if (indexed.isEmpty()) return
+            var runStart = -1
+            var cursor = 0
+            while (cursor <= url.length) {
+                val char = url.getOrNull(cursor)
+                val tokenChar = char != null && (char.isAsciiLetterOrDigitIgnoreCase() || char == '%')
+                if (tokenChar && runStart < 0) runStart = cursor
+                if (!tokenChar && runStart >= 0) {
+                    if (cursor - runStart >= 4) {
+                        indexed[url.substring(runStart, cursor).lowercase(Locale.ROOT)]?.forEach { if (it.matches(context)) action(it) }
+                    }
+                    runStart = -1
+                }
+                cursor++
+            }
+        }
+    }
+
+    private class BucketBuilder {
+        private val indexed = HashMap<String, MutableList<NetworkRule>>()
+        private val unindexed = ArrayList<NetworkRule>()
+        fun add(rule: NetworkRule) {
+            if (rule.token == null) unindexed += rule else indexed.getOrPut(rule.token) { ArrayList() } += rule
+        }
+        fun build() = Bucket(indexed, unindexed)
+    }
 
     private sealed interface UrlPattern {
         fun matches(url: String, requestHost: String): Boolean
@@ -894,14 +1013,21 @@ class FilterEngine private constructor(
     private data class NetworkRule(
         val pattern: UrlPattern, val source: String, val exception: Boolean, val token: String?, val thirdParty: Boolean?,
         val includeTypes: Set<ResourceType>, val excludeTypes: Set<ResourceType>,
-        val includeDomains: Set<String>, val excludeDomains: Set<String>
+        val includeDomains: Set<String>, val excludeDomains: Set<String>,
+        val important: Boolean = false, val contentFlags: Int = 0
     ) {
         fun matches(context: MatchContext): Boolean {
-            if (thirdParty != null && context.thirdParty != thirdParty) return false
+            if (thirdParty != null) {
+                val actual = context.thirdParty ?: return context.lenientUnknownPage
+                if (actual != thirdParty) return false
+            }
             if (includeTypes.isNotEmpty() && context.request.resourceType !in includeTypes) return false
             if (context.request.resourceType in excludeTypes) return false
             val host = context.pageHost
-            if (includeDomains.isNotEmpty() && (host == null || includeDomains.none { hostMatches(host, it) })) return false
+            if (includeDomains.isNotEmpty()) {
+                if (host == null) return context.lenientUnknownPage
+                if (includeDomains.none { hostMatches(host, it) }) return false
+            }
             if (host != null && excludeDomains.any { hostMatches(host, it) }) return false
             return pattern.matches(context.request.url, context.requestHost)
         }
