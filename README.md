@@ -45,6 +45,7 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 - 🔎 **Global Display Scale:** Adjust the full UI and page-content scale together with presets or a custom percentage.
 - 🔄 **Smart Desktop Mode:** Seamlessly toggle between mobile and desktop rendering.
 - 📚 **Dashboard Bookmarks:** Quick access to your favorite sites without touching your phone.
+- 🛡️ **Shields (Ad & Tracker Blocking):** uBlock Origin compatible filtering with EasyList, EasyPrivacy and the uBO lists, cosmetic (element-hiding) filters and scriptlets, weekly background list updates, a per-site switch in the menu and custom list subscriptions. See [docs/ADBLOCK.md](docs/ADBLOCK.md).
 
 
 ### 📸 Screenshots
@@ -86,7 +87,6 @@ If the app fails to launch, try opening a non-Google Maps navigation app (such a
 
 ## ⚠️ Current Issues
 
-- 🚫 **No Ad Blocking:** Ad filtering is not currently implemented (contributions welcome!).
 - 🚗 **Stationary Use Only**
 
 ---
@@ -136,6 +136,22 @@ Every contribution makes AA Browser better!
         <sub><b>gregorixG</b></sub>
       </a><br />
       <sub>Improve desktop site user agent handling</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="20%">
+      <a href="https://github.com/MaoMaoCake">
+        <img src="https://github.com/MaoMaoCake.png?s=100" width="60" alt="MaoMaoCake"/><br />
+        <sub><b>MaoMaoCake</b></sub>
+      </a><br />
+      <sub>Shields filter engine</sub>
+    </td>
+    <td align="center" valign="top" width="20%">
+      <a href="https://github.com/Yash-v-maurya">
+        <img src="https://github.com/Yash-v-maurya.png?s=100" width="60" alt="Yash-v-maurya"/><br />
+        <sub><b>Yash-v-maurya</b></sub>
+      </a><br />
+      <sub>Initial Shields blocking</sub>
     </td>
   </tr>
 </table>
