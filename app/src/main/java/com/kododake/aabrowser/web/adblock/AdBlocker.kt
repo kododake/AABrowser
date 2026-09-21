@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 object AdBlocker {
     private const val FILTERS_ASSET = "adblock/blocklist.txt"
     private const val CACHE_MAGIC = 0x41414246
-    private const val CACHE_VERSION = 3
+    private const val CACHE_VERSION = 4
     private const val MAX_BRIDGE_TOKENS = 512
     private const val MAX_CACHE_BYTES = 256L * 1024 * 1024
 
@@ -131,7 +131,8 @@ object AdBlocker {
     }
 
     private fun loadEngine(context: Context): FilterEngine {
-        val fingerprint = "${BuildConfig.VERSION_CODE}:${RemoteFilterListManager.cacheFingerprint(context)}"
+        val bundledSize = runCatching { context.assets.open(FILTERS_ASSET).use { it.available() } }.getOrDefault(-1)
+        val fingerprint = "${BuildConfig.VERSION_CODE}:${BuildConfig.VERSION_NAME}:$bundledSize:${RemoteFilterListManager.cacheFingerprint(context)}"
         readCachedEngine(context, fingerprint)?.let { return it }
         val replacement = runCatching {
             FilterEngine.parseSources(sequence {
@@ -225,17 +226,43 @@ object AdBlocker {
         val siteHost = pageHost ?: FilterEngine.hostOf(pageUrl) ?: requestUrl.host
         if (isSiteAllowlisted(siteHost)) return null
         if (pageUrl != null && current.pagePolicy(pageUrl).document) return null
+        val type = inferResourceType(requestUrl, requestHeaders)
         if (!current.shouldBlock(FilterEngine.Request(
                 url = requestUrl.toString(),
                 pageUrl = pageUrl,
-                resourceType = inferResourceType(requestUrl, requestHeaders),
+                resourceType = type,
                 requestHost = requestUrl.host,
                 pageHost = pageHost
             ), lenientExceptions = lenient)) return null
 
         sessionBlockCount.incrementAndGet()
-        return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+        return blockedResponse(type)
     }
+
+    /**
+     * A harmless stand-in for the blocked resource, typed so the page does not choke on it: an
+     * empty script/stylesheet, a transparent 1x1 GIF for images, and 204 No Content for fetches.
+     * Never cached, so unblocking a site takes effect on the next load.
+     */
+    internal fun blockedResponse(type: FilterEngine.ResourceType): WebResourceResponse {
+        val headers = mapOf("Cache-Control" to "no-store", "Access-Control-Allow-Origin" to "*")
+        return when (type) {
+            FilterEngine.ResourceType.SCRIPT ->
+                WebResourceResponse("text/javascript", "utf-8", 200, "OK", headers, ByteArrayInputStream(ByteArray(0)))
+            FilterEngine.ResourceType.STYLESHEET ->
+                WebResourceResponse("text/css", "utf-8", 200, "OK", headers, ByteArrayInputStream(ByteArray(0)))
+            FilterEngine.ResourceType.IMAGE ->
+                WebResourceResponse("image/gif", null, 200, "OK", headers, ByteArrayInputStream(TRANSPARENT_GIF))
+            else ->
+                WebResourceResponse("text/plain", "utf-8", 204, "No Content", headers, ByteArrayInputStream(ByteArray(0)))
+        }
+    }
+
+    private val TRANSPARENT_GIF = byteArrayOf(
+        0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80.toByte(), 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0x21, 0xF9.toByte(), 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0x2C,
+        0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3B
+    )
 
     /**
      * JSON for the document-start cosmetic script: `{"s":[...],"o":[...],"g":true}` with the site's
@@ -281,18 +308,44 @@ object AdBlocker {
         return out
     }
 
-    private fun inferResourceType(uri: Uri, headers: Map<String, String>): FilterEngine.ResourceType {
-        val accept = headers.entries.firstOrNull { it.key.equals("Accept", ignoreCase = true) }
-            ?.value.orEmpty()
-        val path = uri.path.orEmpty()
+    /**
+     * WebView does not say what kind of resource a request is for, so it is inferred: the
+     * `Sec-Fetch-Dest` header when Chromium exposes it, then the URL's extension, then the
+     * `Accept` header, and finally a wildcard Accept plus an `Origin` header is taken as a fetch/XHR.
+     */
+    internal fun inferResourceType(uri: Uri, headers: Map<String, String>): FilterEngine.ResourceType =
+        inferResourceType(uri.path.orEmpty(), headers)
+
+    internal fun inferResourceType(path: String, headers: Map<String, String>): FilterEngine.ResourceType {
+        fun header(name: String) = headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value.orEmpty()
+        when (header("Sec-Fetch-Dest").lowercase(Locale.ROOT)) {
+            "script", "worker", "sharedworker", "serviceworker", "audioworklet", "paintworklet" -> return FilterEngine.ResourceType.SCRIPT
+            "image" -> return FilterEngine.ResourceType.IMAGE
+            "style" -> return FilterEngine.ResourceType.STYLESHEET
+            "font" -> return FilterEngine.ResourceType.FONT
+            "audio", "video", "track" -> return FilterEngine.ResourceType.MEDIA
+            "iframe", "frame", "fencedframe", "embed", "object" -> return FilterEngine.ResourceType.SUBDOCUMENT
+            "empty" -> return FilterEngine.ResourceType.XHR
+            "manifest", "report", "xslt" -> return FilterEngine.ResourceType.OTHER
+        }
+        when {
+            path.endsWith(".css", ignoreCase = true) -> return FilterEngine.ResourceType.STYLESHEET
+            path.endsWithAny(SCRIPT_EXTENSIONS) -> return FilterEngine.ResourceType.SCRIPT
+            path.endsWithAny(IMAGE_EXTENSIONS) -> return FilterEngine.ResourceType.IMAGE
+            path.endsWithAny(FONT_EXTENSIONS) -> return FilterEngine.ResourceType.FONT
+            path.endsWithAny(MEDIA_EXTENSIONS) -> return FilterEngine.ResourceType.MEDIA
+            path.endsWithAny(DATA_EXTENSIONS) -> return FilterEngine.ResourceType.XHR
+        }
+        val accept = header("Accept")
         return when {
-            accept.contains("text/css", ignoreCase = true) || path.endsWith(".css", ignoreCase = true) -> FilterEngine.ResourceType.STYLESHEET
-            accept.contains("image/", ignoreCase = true) || path.endsWithAny(IMAGE_EXTENSIONS) -> FilterEngine.ResourceType.IMAGE
-            accept.contains("font/", ignoreCase = true) || path.endsWithAny(FONT_EXTENSIONS) -> FilterEngine.ResourceType.FONT
-            accept.contains("audio/", ignoreCase = true) || accept.contains("video/", ignoreCase = true) || path.endsWithAny(MEDIA_EXTENSIONS) -> FilterEngine.ResourceType.MEDIA
-            accept.contains("javascript", ignoreCase = true) || path.endsWithAny(SCRIPT_EXTENSIONS) -> FilterEngine.ResourceType.SCRIPT
+            accept.contains("text/css", ignoreCase = true) -> FilterEngine.ResourceType.STYLESHEET
+            accept.contains("image/", ignoreCase = true) -> FilterEngine.ResourceType.IMAGE
+            accept.contains("font/", ignoreCase = true) -> FilterEngine.ResourceType.FONT
+            accept.contains("audio/", ignoreCase = true) || accept.contains("video/", ignoreCase = true) -> FilterEngine.ResourceType.MEDIA
+            accept.contains("javascript", ignoreCase = true) -> FilterEngine.ResourceType.SCRIPT
             accept.contains("application/json", ignoreCase = true) || accept.contains("text/event-stream", ignoreCase = true) -> FilterEngine.ResourceType.XHR
             accept.contains("text/html", ignoreCase = true) -> FilterEngine.ResourceType.SUBDOCUMENT
+            accept.trim() == "*/*" && header("Origin").isNotEmpty() -> FilterEngine.ResourceType.XHR
             else -> FilterEngine.ResourceType.OTHER
         }
     }
@@ -304,4 +357,5 @@ object AdBlocker {
     private val FONT_EXTENSIONS = arrayOf(".woff", ".woff2", ".ttf", ".otf", ".eot")
     private val MEDIA_EXTENSIONS = arrayOf(".mp3", ".mp4", ".webm", ".m3u8", ".ts", ".ogg", ".wav")
     private val SCRIPT_EXTENSIONS = arrayOf(".js", ".mjs")
+    private val DATA_EXTENSIONS = arrayOf(".json", ".xml")
 }

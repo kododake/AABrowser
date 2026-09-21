@@ -416,6 +416,70 @@ class FilterEngineTest {
         assertFalse(FilterEngine.hostWithinAny("news.test", emptySet()))
     }
 
+    @Test
+    fun `host parsing survives real-world ad urls that java net uri rejects`() {
+        assertTrue(FilterEngine.hostOf("https://ads.test/pixel?x=a|b{c}") == "ads.test")
+        assertTrue(FilterEngine.hostOf("https://user:pw@Ads.Test.:8443/path") == "ads.test")
+        assertTrue(FilterEngine.hostOf("http://ad_server.test/a b") == "ad_server.test")
+        assertTrue(FilterEngine.hostOf("https://[2001:db8::1]:443/x") == "2001:db8::1")
+        assertTrue(FilterEngine.hostOf("https://例え.テスト/x") == "例え.テスト")
+        assertTrue(FilterEngine.hostOf("wss://sock.test#frag") == "sock.test")
+        assertTrue(FilterEngine.hostOf("https://ads.test\\path") == "ads.test")
+        assertTrue(FilterEngine.hostOf("file:///android_asset/error.html?failedUrl=x") == null)
+        assertTrue(FilterEngine.hostOf("about:blank") == null)
+        assertTrue(FilterEngine.hostOf("data:text/html,hi") == null)
+        assertTrue(FilterEngine.hostOf("javascript:void(0)") == null)
+        assertTrue(FilterEngine.hostOf("https:///nohost") == null)
+        assertTrue(FilterEngine.hostOf("") == null)
+        assertTrue(FilterEngine.hostOf(null) == null)
+    }
+
+    @Test
+    fun `third party detection uses a public suffix heuristic`() {
+        assertTrue(FilterEngine.registrableDomain("shop.example.co.uk") == "example.co.uk")
+        assertTrue(FilterEngine.registrableDomain("a.b.example.com") == "example.com")
+        assertTrue(FilterEngine.registrableDomain("alice.github.io") == "alice.github.io")
+        assertTrue(FilterEngine.registrableDomain("blog.blogspot.de") == "blog.blogspot.de")
+        assertTrue(FilterEngine.registrableDomain("news.example.ac.jp") == "example.ac.jp")
+        assertTrue(FilterEngine.registrableDomain("example.io") == "example.io")
+        val engine = engine("||cdn.test^${'$'}third-party")
+        assertFalse(engine.blocks("https://cdn.test/a.js", "https://www.cdn.test/"))
+        assertTrue(engine.blocks("https://cdn.test/a.js", "https://bob.github.io/"))
+        val pages = engine("||alice.github.io^${'$'}third-party")
+        assertTrue(pages.blocks("https://alice.github.io/a.js", "https://bob.github.io/"))
+        assertFalse(pages.blocks("https://alice.github.io/a.js", "https://alice.github.io/"))
+    }
+
+    @Test
+    fun `glob patterns match wildcards separators and anchors without regexes`() {
+        val engine = engine(
+            "||ads.test/*.js^",
+            "/banner_*_wide.",
+            "|https://start.test/*/ad^",
+            "||end.test/x*|",
+            "||sep.test/a^b"
+        )
+        assertTrue(engine.blocks("https://cdn.ads.test/lib/a.js?x=1"))
+        assertTrue(engine.blocks("https://cdn.ads.test/lib/a.js"))
+        assertFalse(engine.blocks("https://cdn.ads.test/lib/a.json"))
+        assertFalse(engine.blocks("https://notads.test/lib/a.js"))
+        assertTrue(engine.blocks("https://any.test/img/banner_300_wide.png"))
+        assertFalse(engine.blocks("https://any.test/img/banner_300_narrow.png"))
+        assertTrue(engine.blocks("https://start.test/one/two/ad?x"))
+        assertFalse(engine.blocks("https://other.test/https://start.test/one/ad"))
+        assertTrue(engine.blocks("https://end.test/xyz"))
+        assertTrue(engine.blocks("https://end.test/xyz/more")) // `*` spans slashes, as in uBO
+        assertFalse(engine.blocks("https://end.test/y"))
+        assertFalse(engine("||end.test/x^|").blocks("https://end.test/xyz"))
+        assertTrue(engine("||end.test/x^|").blocks("https://end.test/x"))
+        assertTrue(engine("||end.test/x^|").blocks("https://end.test/x/"))
+        assertTrue(engine.blocks("https://sep.test/a/b"))
+        assertFalse(engine.blocks("https://sep.test/a-b"))
+        assertTrue(engine("||case.test/*Ad^${'$'}match-case").blocks("https://case.test/x/Ad/"))
+        assertFalse(engine("||case.test/*Ad^${'$'}match-case").blocks("https://case.test/x/ad/"))
+        assertTrue(engine("***").ruleCount == 0)
+    }
+
     private fun engine(vararg rules: String) = FilterEngine.parse(rules.asSequence())
 
     /** Every selector the document-start script would hide on [url] given the page's [classes]/[ids]. */

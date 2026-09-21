@@ -2,7 +2,6 @@ package com.kododake.aabrowser.web.adblock
 
 import java.io.DataInput
 import java.io.DataOutput
-import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
@@ -282,8 +281,16 @@ class FilterEngine private constructor(
                 }
                 is RegexPattern -> {
                     output.writeByte(PATTERN_REGEX)
-                    output.writeSizedString(pattern.regex.pattern)
-                    output.writeBoolean(RegexOption.IGNORE_CASE in pattern.regex.options)
+                    output.writeSizedString(pattern.source)
+                    output.writeBoolean(pattern.ignoreCase)
+                }
+                is GlobPattern -> {
+                    output.writeByte(PATTERN_GLOB)
+                    output.writeSizedString(pattern.text)
+                    output.writeBoolean(pattern.matchCase)
+                    output.writeBoolean(pattern.hostAnchored)
+                    output.writeBoolean(pattern.startAnchored)
+                    output.writeBoolean(pattern.endAnchored)
                 }
                 is LiteralPattern -> {
                     output.writeByte(PATTERN_LITERAL)
@@ -344,6 +351,7 @@ class FilterEngine private constructor(
         private const val PATTERN_HOST = 1
         private const val PATTERN_REGEX = 2
         private const val PATTERN_LITERAL = 3
+        private const val PATTERN_GLOB = 4
         private const val MAX_SNAPSHOT_RULES = 2_000_000
         private const val MAX_SNAPSHOT_COLLECTION_SIZE = 100_000
         private const val MAX_SNAPSHOT_STRING_BYTES = 16 * 1024 * 1024
@@ -418,10 +426,11 @@ class FilterEngine private constructor(
             repeat(networkCount) {
                 val pattern = when (val type = input.readUnsignedByte()) {
                     PATTERN_HOST -> HostPattern(input.readSizedString())
-                    PATTERN_REGEX -> RegexPattern(Regex(
-                        input.readSizedString(),
-                        if (input.readBoolean()) setOf(RegexOption.IGNORE_CASE) else emptySet()
-                    ))
+                    PATTERN_REGEX -> RegexPattern(input.readSizedString(), input.readBoolean())
+                    PATTERN_GLOB -> GlobPattern(
+                        input.readSizedString(), input.readBoolean(), input.readBoolean(),
+                        input.readBoolean(), input.readBoolean()
+                    )
                     PATTERN_LITERAL -> LiteralPattern(
                         input.readSizedString(), input.readBoolean(), input.readBoolean(),
                         input.readBoolean(), input.readBoolean()
@@ -754,7 +763,9 @@ class FilterEngine private constructor(
         private fun compilePattern(text: String, matchCase: Boolean): UrlPattern? {
             val flags = if (matchCase) emptySet() else setOf(RegexOption.IGNORE_CASE)
             if (text.length > 2 && text.startsWith('/') && text.endsWith('/')) {
-                return runCatching { RegexPattern(Regex(text.drop(1).dropLast(1), flags)) }.getOrNull()
+                val source = text.drop(1).dropLast(1)
+                // Validate once at parse time; snapshots re-compile lazily on first use.
+                return runCatching { Regex(source, flags) }.getOrNull()?.let { RegexPattern(source, !matchCase) }
             }
             val normalized = text.lowercase(Locale.ROOT)
             if (isDomainOnly(normalized)) {
@@ -773,18 +784,13 @@ class FilterEngine private constructor(
             if ('*' !in pattern && '^' !in pattern) {
                 return LiteralPattern(pattern, matchCase, hostAnchored, startAnchored, endAnchored)
             }
-            val regex = StringBuilder()
-            when { hostAnchored -> regex.append("^[a-z][a-z0-9+.-]*://(?:[^/?#]*\\.)?"); startAnchored -> regex.append('^') }
-            pattern.forEach { char ->
-                when (char) {
-                    '*' -> regex.append(".*")
-                    '^' -> regex.append("(?:[^A-Za-z0-9_.%-]|$)")
-                    else -> appendRegexLiteral(regex, char)
-                }
-            }
-            if (endAnchored) regex.append('$')
-            return runCatching { RegexPattern(Regex(regex.toString(), flags)) }.getOrNull()
+            // Collapse runs of wildcards; a pattern that is nothing but wildcards would match everything.
+            val collapsed = pattern.replace(MULTI_STAR, "*")
+            if (collapsed.all { it == '*' }) return null
+            return GlobPattern(collapsed, matchCase, hostAnchored, startAnchored, endAnchored)
         }
+
+        private val MULTI_STAR = Regex("\\*{2,}")
 
         private fun isDomainOnly(value: String): Boolean {
             if (value.isEmpty() || !value.first().isAsciiLetterOrDigit() ||
@@ -867,15 +873,6 @@ class FilterEngine private constructor(
             }
         }
 
-        private fun appendRegexLiteral(output: StringBuilder, char: Char) {
-            if (char == '\\' || char == '.' || char == '[' || char == ']' || char == '{' ||
-                char == '}' || char == '(' || char == ')' || char == '+' || char == '?' ||
-                char == '$' || char == '|') {
-                output.append('\\')
-            }
-            output.append(char)
-        }
-
         /** True when [host] equals one of [domains] or is a subdomain of it (never a substring match). */
         fun hostWithinAny(host: String?, domains: Collection<String>): Boolean {
             val normalized = host?.let(::normalizeHost)?.takeIf { it.isNotEmpty() } ?: return false
@@ -883,7 +880,41 @@ class FilterEngine private constructor(
             return domains.any { domain -> normalized == domain || normalized.endsWith(".$domain") }
         }
 
-        internal fun hostOf(url: String?): String? = runCatching { url?.let(::URI)?.host?.let(::normalizeHost) }.getOrNull()
+        /**
+         * Host of an http(s)/ws(s)-style URL, lower-cased without the trailing dot, or null for
+         * anything without an authority (`about:`, `data:`, `file:`, `javascript:`). Parsed by
+         * hand: java.net.URI rejects many real-world ad URLs (`|`, `{}`, spaces, `_` in labels,
+         * unencoded Unicode), and a rejected URL would silently escape every rule.
+         */
+        internal fun hostOf(url: String?): String? {
+            if (url.isNullOrEmpty()) return null
+            val schemeEnd = url.indexOf("://")
+            if (schemeEnd <= 0) return null
+            for (index in 0 until schemeEnd) {
+                val char = url[index]
+                if (!(char in 'a'..'z' || char in 'A'..'Z' || char in '0'..'9' || char == '+' || char == '-' || char == '.')) return null
+            }
+            var start = schemeEnd + 3
+            var end = url.length
+            for (index in start until url.length) {
+                val char = url[index]
+                if (char == '/' || char == '?' || char == '#' || char == '\\') { end = index; break }
+            }
+            val userInfo = url.lastIndexOf('@', end - 1)
+            if (userInfo >= start) start = userInfo + 1
+            if (start >= end) return null
+            val host = if (url[start] == '[') {
+                val close = url.indexOf(']', start)
+                if (close < 0 || close >= end) return null
+                url.substring(start + 1, close)
+            } else {
+                val colon = url.indexOf(':', start)
+                url.substring(start, if (colon in start until end) colon else end)
+            }
+            val normalized = normalizeHost(host)
+            if (normalized.isEmpty() || normalized.any { it.isWhitespace() || it == '/' }) return null
+            return normalized
+        }
         private fun normalizeHost(host: String) = host.trim().trimEnd('.').lowercase(Locale.ROOT)
         private fun hostMatches(host: String, domain: String): Boolean {
             if (domain.startsWith('/') && domain.endsWith('/') && domain.length > 2) {
@@ -898,7 +929,17 @@ class FilterEngine private constructor(
             }
             return host == domain || host.endsWith(".$domain")
         }
-        private val COMMON_SECOND_LEVEL_SUFFIXES = setOf("co.uk", "org.uk", "com.au", "net.au", "co.jp", "co.nz", "com.br", "com.cn", "com.sg", "co.in")
+        /** Second-level labels that are public suffixes under two-letter country TLDs (co.uk, com.au, ac.jp, ...). */
+        private val GENERIC_SECOND_LEVEL_LABELS = setOf(
+            "co", "com", "org", "net", "gov", "edu", "ac", "ne", "or", "go", "mil", "sch", "ltd", "plc", "nom", "me", "info", "biz", "id"
+        )
+        /** Hosting providers whose customers' subdomains are unrelated sites. */
+        private val EXPLICIT_PUBLIC_SUFFIXES = setOf(
+            "github.io", "gitlab.io", "pages.dev", "web.app", "netlify.app", "vercel.app", "herokuapp.com",
+            "firebaseapp.com", "azurewebsites.net", "cloudfront.net", "amazonaws.com", "wordpress.com", "tumblr.com",
+            "appspot.com", "workers.dev", "surge.sh", "onrender.com", "fly.dev"
+        )
+        private val BRAND_SECOND_LEVEL_LABELS = setOf("blogspot")
         private fun sameSite(first: String, second: String): Boolean {
             val firstStart = siteKeyStart(first)
             val secondStart = siteKeyStart(second)
@@ -907,21 +948,25 @@ class FilterEngine private constructor(
                 first.regionMatches(firstStart, second, secondStart, length, ignoreCase = true)
         }
 
-        private fun siteKeyStart(host: String): Int {
+        /** Index where the registrable ("site") part of [host] starts, using a small public-suffix heuristic. */
+        internal fun siteKeyStart(host: String): Int {
             val lastDot = host.lastIndexOf('.')
             if (lastDot < 0) return 0
             val secondLastDot = host.lastIndexOf('.', lastDot - 1)
             if (secondLastDot < 0) return 0
-            val suffixStart = secondLastDot + 1
-            val suffixLength = host.length - suffixStart
-            val hasCommonSecondLevelSuffix = COMMON_SECOND_LEVEL_SUFFIXES.any { suffix ->
-                suffix.length == suffixLength &&
-                    host.regionMatches(suffixStart, suffix, 0, suffixLength, ignoreCase = true)
-            }
-            if (!hasCommonSecondLevelSuffix) return suffixStart
+            val tld = host.substring(lastDot + 1)
+            val secondLevel = host.substring(secondLastDot + 1, lastDot)
+            val twoLabelSuffix = host.substring(secondLastDot + 1)
+            val suffixHasTwoLabels = twoLabelSuffix in EXPLICIT_PUBLIC_SUFFIXES ||
+                secondLevel in BRAND_SECOND_LEVEL_LABELS ||
+                (tld.length == 2 && secondLevel in GENERIC_SECOND_LEVEL_LABELS)
+            if (!suffixHasTwoLabels) return secondLastDot + 1
             val thirdLastDot = host.lastIndexOf('.', secondLastDot - 1)
             return if (thirdLastDot < 0) 0 else thirdLastDot + 1
         }
+
+        /** Registrable domain of [host] (e.g. `shop.example.co.uk` -> `example.co.uk`). */
+        internal fun registrableDomain(host: String): String = host.substring(siteKeyStart(host))
     }
 
     /** [thirdParty] is null when the requesting page is unknown; [lenientUnknownPage] then makes party and domain constraints count as satisfied. */
@@ -979,8 +1024,83 @@ class FilterEngine private constructor(
         override fun matches(url: String, requestHost: String): Boolean = hostMatches(requestHost, host)
     }
 
-    private data class RegexPattern(val regex: Regex) : UrlPattern {
+    /** `/.../` rules. The Regex is compiled on first use so loading a snapshot stays cheap. */
+    private data class RegexPattern(val source: String, val ignoreCase: Boolean) : UrlPattern {
+        private val regex: Regex by lazy(LazyThreadSafetyMode.PUBLICATION) {
+            Regex(source, if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet())
+        }
         override fun matches(url: String, requestHost: String): Boolean = regex.containsMatchIn(url)
+    }
+
+    /**
+     * ABP-style patterns with `*` (any run) and `^` (a separator: anything but a letter, digit,
+     * `_`, `-`, `.`, `%`, or the end of the URL), matched directly instead of through a regex.
+     */
+    private data class GlobPattern(
+        val text: String,
+        val matchCase: Boolean,
+        val hostAnchored: Boolean,
+        val startAnchored: Boolean,
+        val endAnchored: Boolean
+    ) : UrlPattern {
+        override fun matches(url: String, requestHost: String): Boolean {
+            if (hostAnchored) {
+                val schemeEnd = url.indexOf("://")
+                if (schemeEnd < 1) return false
+                val authorityStart = schemeEnd + 3
+                val authorityEnd = url.indexOfAny(charArrayOf('/', '?', '#'), authorityStart)
+                    .let { if (it < 0) url.length else it }
+                if (matchesAt(url, authorityStart)) return true
+                for (index in authorityStart until authorityEnd) {
+                    if (url[index] == '.' && matchesAt(url, index + 1)) return true
+                }
+                return false
+            }
+            if (startAnchored) return matchesAt(url, 0)
+            for (start in 0..url.length) if (matchesAt(url, start)) return true
+            return false
+        }
+
+        private fun matchesAt(url: String, start: Int): Boolean {
+            var u = start
+            var p = 0
+            var starP = -1
+            var starU = -1
+            while (true) {
+                if (p < text.length) {
+                    val pc = text[p]
+                    if (pc == '*') {
+                        starP = p
+                        starU = u
+                        p++
+                        continue
+                    }
+                    if (u < url.length && charMatches(pc, url[u])) {
+                        p++
+                        u++
+                        continue
+                    }
+                    if (pc == '^' && u == url.length) {
+                        // A separator may also match the end of the URL, consuming nothing.
+                        p++
+                        continue
+                    }
+                } else if (u == url.length || !endAnchored) {
+                    return true
+                }
+                if (starP < 0) return false
+                // Backtrack: let the last `*` absorb one more character.
+                starU++
+                if (starU > url.length) return false
+                u = starU
+                p = starP + 1
+            }
+        }
+
+        private fun charMatches(patternChar: Char, urlChar: Char): Boolean = when (patternChar) {
+            '^' -> !(urlChar.isLetterOrDigit() || urlChar == '_' || urlChar == '-' || urlChar == '.' || urlChar == '%')
+            else -> patternChar == urlChar || (!matchCase && patternChar.equals(urlChar, ignoreCase = true))
+        }
     }
 
     private data class LiteralPattern(
