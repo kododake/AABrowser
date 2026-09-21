@@ -38,11 +38,12 @@ object RemoteFilterListManager {
     private val TRUSTED_LIST_IDS = setOf(
         "ublock-filters", "ublock-privacy", "ublock-unbreak", "ublock-quick-fixes"
     )
+    // Only for quick subscription edits; downloads go through FilterListUpdateWorker.
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread({
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
             runnable.run()
-        }, "adblock-list-updater")
+        }, "adblock-list-editor")
     }
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val client = OkHttpClient.Builder()
@@ -60,6 +61,9 @@ object RemoteFilterListManager {
         Subscription("easylist", "EasyList", "https://ublockorigin.github.io/uAssets/thirdparties/easylist.txt", true, true),
         Subscription("easyprivacy", "EasyPrivacy", "https://ublockorigin.github.io/uAssets/thirdparties/easyprivacy.txt", true, true)
     )
+
+    /** The built-in subscriptions as shipped, independent of the user's stored state. */
+    internal fun defaultSubscriptions(): List<Subscription> = defaults
 
     @Synchronized
     fun subscriptions(context: Context): List<Subscription> {
@@ -82,7 +86,8 @@ object RemoteFilterListManager {
         executor.execute {
             setEnabled(appContext, enabledIds)
             AdBlocker.reload(appContext)
-            scheduleAutoUpdate(appContext)
+            // Newly enabled lists have no cache yet; fetch them right away.
+            if (subscriptions(appContext).any { it.enabled && it.lastUpdated == 0L }) refresh(appContext, force = false)
             callback?.let { cb -> mainHandler.post(cb) }
         }
     }
@@ -147,46 +152,59 @@ object RemoteFilterListManager {
         }
     }
 
+    /** Queues a background refresh of any enabled list that is older than the refresh interval. */
     fun scheduleAutoUpdate(context: Context) {
-        val now = System.currentTimeMillis()
-        if (subscriptions(context).none { it.enabled && now - it.lastUpdated >= UPDATE_INTERVAL_MS }) return
-        refresh(context, force = false)
+        FilterListUpdateWorker.schedulePeriodic(context)
     }
 
+    /** Refreshes through WorkManager (network-aware, survives the activity) and reports on the main thread. */
     fun refresh(context: Context, force: Boolean = true, callback: ((UpdateResult) -> Unit)? = null) {
+        FilterListUpdateWorker.enqueueNow(context, force, callback)
+    }
+
+    /**
+     * Downloads every enabled subscription that is due (all of them when [force]). Runs on the
+     * caller's thread; [FilterListUpdateWorker] is the only expected caller. Each subscription's
+     * new state is merged by id under the lock, so a concurrent enable/disable or custom-list edit
+     * made while the downloads were running is not overwritten with a stale snapshot.
+     */
+    fun refreshBlocking(context: Context, force: Boolean): UpdateResult {
         val appContext = context.applicationContext
-        executor.execute {
-            val now = System.currentTimeMillis()
-            var updated = 0
-            var unchanged = 0
-            var failed = 0
-            val next = subscriptions(appContext).map { subscription ->
-                if (!subscription.enabled || (!force && now - subscription.lastUpdated < UPDATE_INTERVAL_MS)) {
-                    subscription
-                } else {
-                    when (val result = download(appContext, subscription)) {
-                        is DownloadResult.Updated -> {
-                            updated++
-                            subscription.copy(
-                                lastUpdated = now, ruleCount = result.ruleCount,
-                                etag = result.etag, lastModified = result.lastModified, lastError = null
-                            )
-                        }
-                        DownloadResult.Unchanged -> {
-                            unchanged++
-                            subscription.copy(lastUpdated = now, lastError = null)
-                        }
-                        is DownloadResult.Failed -> {
-                            failed++
-                            subscription.copy(lastError = result.message)
-                        }
-                    }
+        val now = System.currentTimeMillis()
+        var updated = 0
+        var unchanged = 0
+        var failed = 0
+        val results = HashMap<String, Subscription>()
+        subscriptions(appContext).forEach { subscription ->
+            if (!subscription.enabled || (!force && now - subscription.lastUpdated < UPDATE_INTERVAL_MS)) return@forEach
+            results[subscription.id] = when (val result = download(appContext, subscription)) {
+                is DownloadResult.Updated -> {
+                    updated++
+                    subscription.copy(
+                        lastUpdated = now, ruleCount = result.ruleCount,
+                        etag = result.etag, lastModified = result.lastModified, lastError = null
+                    )
+                }
+                DownloadResult.Unchanged -> {
+                    unchanged++
+                    subscription.copy(lastUpdated = now, lastError = null)
+                }
+                is DownloadResult.Failed -> {
+                    failed++
+                    subscription.copy(lastError = result.message)
                 }
             }
-            save(appContext, next)
-            if (updated > 0) AdBlocker.reload(appContext)
-            callback?.let { cb -> mainHandler.post { cb(UpdateResult(updated, unchanged, failed)) } }
         }
+        if (results.isNotEmpty()) {
+            synchronized(this) {
+                save(appContext, subscriptions(appContext).map { current ->
+                    val refreshed = results[current.id] ?: return@map current
+                    // Keep the user's latest enabled flag; take the download metadata.
+                    refreshed.copy(enabled = current.enabled, title = current.title)
+                })
+            }
+        }
+        return UpdateResult(updated, unchanged, failed)
     }
 
     internal fun isValidRemoteUrl(value: String): Boolean {

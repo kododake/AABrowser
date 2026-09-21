@@ -99,7 +99,7 @@ object AdBlocker {
                 readyCallbacks.clear()
             }
             mainHandler.post { callbacks.forEach { it() } }
-            RemoteFilterListManager.scheduleAutoUpdate(appContext)
+            FilterListUpdateWorker.schedulePeriodic(appContext)
         }
     }
 
@@ -200,7 +200,8 @@ object AdBlocker {
         pageUrl: String?,
         pageHost: String? = null,
         isMainFrame: Boolean,
-        requestHeaders: Map<String, String> = emptyMap()
+        requestHeaders: Map<String, String> = emptyMap(),
+        lenient: Boolean = false
     ): WebResourceResponse? {
         if (isMainFrame || requestUrl == null) return null
         val scheme = requestUrl.scheme?.lowercase(Locale.ROOT)
@@ -213,7 +214,7 @@ object AdBlocker {
                 resourceType = inferResourceType(requestUrl, requestHeaders),
                 requestHost = requestUrl.host,
                 pageHost = pageHost
-            ))) return null
+            ), lenientExceptions = lenient)) return null
 
         sessionBlockCount.incrementAndGet()
         return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))

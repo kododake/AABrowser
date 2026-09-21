@@ -26,6 +26,7 @@ import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.web.adblock.AdBlocker
+import com.kododake.aabrowser.web.adblock.ServiceWorkerShields
 import com.kododake.aabrowser.web.adblock.ShieldsRuntime
 
 data class BrowserCallbacks(
@@ -102,6 +103,7 @@ fun configureWebView(
         setTag(R.id.webview_shields_enabled_tag, shieldsEnabled)
         if (shieldsEnabled.get()) AdBlocker.ensureLoadedAsync(appContext)
         ShieldsRuntime.install(this, shieldsEnabled.get())
+        ServiceWorkerShields.installOnce(appContext)
 
         CookieManager.getInstance().also {
             it.setAcceptCookie(true)
