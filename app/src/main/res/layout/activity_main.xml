@@ -671,7 +671,7 @@
                                         android:layout_width="match_parent"
                                         android:layout_height="wrap_content"
                                         android:columnCount="3"
-                                        android:rowCount="2"
+                                        android:rowCount="3"
                                         android:padding="12dp"
                                         android:alignmentMode="alignBounds"
                                         android:columnOrderPreserved="false">
@@ -769,6 +769,23 @@
                                         android:textSize="13sp"
                                         app:icon="@drawable/settings_24px"
                                         app:iconGravity="top"
+                                        app:iconSize="@dimen/icon_size_small"
+                                        app:iconPadding="4dp" />
+
+                                    <com.google.android.material.button.MaterialButton
+                                        android:id="@+id/buttonShieldsSite"
+                                        style="@style/Widget.Material3.Button.TonalButton"
+                                        android:layout_width="0dp"
+                                        android:layout_height="wrap_content"
+                                        android:layout_columnWeight="1"
+                                        android:layout_row="2"
+                                        android:layout_column="0"
+                                        android:layout_columnSpan="3"
+                                        android:layout_margin="4dp"
+                                        android:text="@string/menu_shields_site"
+                                        android:textSize="13sp"
+                                        app:icon="@drawable/security_24px"
+                                        app:iconGravity="textStart"
                                         app:iconSize="@dimen/icon_size_small"
                                         app:iconPadding="4dp" />
 

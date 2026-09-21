@@ -278,6 +278,39 @@ class BrowserUIManager(
         bookmarkManager.refreshBookmarks()
         tabManager.refreshTabs()
         startPageManager.refreshStartPage()
+        refreshShieldsSiteButton()
+    }
+
+    /** Reflects the active tab's per-site Shields state on the menu button. */
+    fun refreshShieldsSiteButton() {
+        val button = binding.buttonShieldsSite
+        val host = shieldsSiteHost()
+        when {
+            !BrowserPreferences.isShieldsEnabled(activity) -> {
+                button.isEnabled = false
+                button.text = activity.getString(R.string.menu_shields_site_disabled)
+            }
+            host == null -> {
+                button.isEnabled = false
+                button.text = activity.getString(R.string.menu_shields_site_unavailable)
+            }
+            BrowserPreferences.isShieldsDisabledForHost(activity, host) -> {
+                button.isEnabled = true
+                button.text = activity.getString(R.string.menu_shields_site_off, host)
+            }
+            else -> {
+                button.isEnabled = true
+                button.text = activity.getString(R.string.menu_shields_site_on, host)
+            }
+        }
+    }
+
+    /** Host of the active tab's page when it is a web page, otherwise null. */
+    fun shieldsSiteHost(): String? {
+        val url = tabManager.activeTab?.webView?.url ?: tabManager.activeTab?.currentUrl
+        val uri = url?.takeIf { it.isNotBlank() }?.let { runCatching { Uri.parse(it) }.getOrNull() } ?: return null
+        if (uri.scheme?.lowercase() !in setOf("http", "https")) return null
+        return uri.host?.lowercase()?.takeIf { it.isNotEmpty() }
     }
 
     fun hideMenuOverlay() {

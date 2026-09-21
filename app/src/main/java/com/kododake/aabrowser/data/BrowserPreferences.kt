@@ -49,6 +49,7 @@ object BrowserPreferences {
     private const val KEY_ALLOWED_LOCATION_HOSTS = "allowed_location_hosts"
     private const val KEY_HIDE_SPONSORS = "hide_sponsors"
     private const val KEY_SHIELDS_ENABLED = "shields_enabled"
+    private const val KEY_SHIELDS_DISABLED_HOSTS = "shields_disabled_hosts"
     private const val DEFAULT_URL = "https://www.google.com"
     private const val SEARCH_TEMPLATE = "https://www.google.com/search?q=%s"
 
@@ -503,6 +504,18 @@ object BrowserPreferences {
             .apply()
     }
 
+    /** Hosts (and their subdomains) on which the user switched Shields off. */
+    fun getShieldsDisabledHosts(context: Context): Set<String> =
+        loadHostList(context, KEY_SHIELDS_DISABLED_HOSTS)
+
+    fun isShieldsDisabledForHost(context: Context, host: String?): Boolean =
+        isHostAllowed(context, KEY_SHIELDS_DISABLED_HOSTS, host)
+
+    fun setShieldsDisabledForHost(context: Context, host: String, disabled: Boolean) {
+        if (disabled) addAllowedHost(context, KEY_SHIELDS_DISABLED_HOSTS, host)
+        else removeAllowedHost(context, KEY_SHIELDS_DISABLED_HOSTS, host)
+    }
+
     fun formatNavigableUrl(raw: String): String {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return DEFAULT_URL
@@ -576,6 +589,27 @@ object BrowserPreferences {
             }
             false
         }.getOrDefault(false)
+    }
+
+    private fun loadHostList(context: Context, key: String): Set<String> {
+        val serialized = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(key, null)
+            ?: return emptySet()
+        return runCatching {
+            val array = JSONArray(serialized)
+            buildSet(array.length()) {
+                for (i in 0 until array.length()) array.optString(i).trim().lowercase().takeIf { it.isNotEmpty() }?.let(::add)
+            }
+        }.getOrDefault(emptySet())
+    }
+
+    private fun removeAllowedHost(context: Context, key: String, host: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val normalizedHost = host.trim().lowercase()
+        if (normalizedHost.isEmpty()) return
+        val remaining = loadHostList(context, key).filterNot { it == normalizedHost }
+        val out = JSONArray()
+        remaining.forEach { out.put(it) }
+        prefs.edit().putString(key, out.toString()).apply()
     }
 
     private fun addAllowedHost(context: Context, key: String, host: String) {

@@ -403,6 +403,19 @@ class FilterEngineTest {
         assertTrue(engine.blocks("https://party.test/a.js", "https://news.test"))
     }
 
+    @Test
+    fun `site allowlist matches exact hosts and subdomains only`() {
+        val hosts = setOf("news.test", "shop.example.test")
+        assertTrue(FilterEngine.hostWithinAny("news.test", hosts))
+        assertTrue(FilterEngine.hostWithinAny("www.news.test", hosts))
+        assertTrue(FilterEngine.hostWithinAny("NEWS.TEST.", hosts))
+        assertFalse(FilterEngine.hostWithinAny("news.test.attacker.test", hosts))
+        assertFalse(FilterEngine.hostWithinAny("fakenews.test", hosts))
+        assertFalse(FilterEngine.hostWithinAny("example.test", hosts))
+        assertFalse(FilterEngine.hostWithinAny(null, hosts))
+        assertFalse(FilterEngine.hostWithinAny("news.test", emptySet()))
+    }
+
     private fun engine(vararg rules: String) = FilterEngine.parse(rules.asSequence())
 
     /** Every selector the document-start script would hide on [url] given the page's [classes]/[ids]. */

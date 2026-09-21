@@ -876,6 +876,13 @@ class FilterEngine private constructor(
             output.append(char)
         }
 
+        /** True when [host] equals one of [domains] or is a subdomain of it (never a substring match). */
+        fun hostWithinAny(host: String?, domains: Collection<String>): Boolean {
+            val normalized = host?.let(::normalizeHost)?.takeIf { it.isNotEmpty() } ?: return false
+            if (domains.isEmpty()) return false
+            return domains.any { domain -> normalized == domain || normalized.endsWith(".$domain") }
+        }
+
         internal fun hostOf(url: String?): String? = runCatching { url?.let(::URI)?.host?.let(::normalizeHost) }.getOrNull()
         private fun normalizeHost(host: String) = host.trim().trimEnd('.').lowercase(Locale.ROOT)
         private fun hostMatches(host: String, domain: String): Boolean {

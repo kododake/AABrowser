@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.Process
 import android.webkit.WebResourceResponse
 import com.kododake.aabrowser.BuildConfig
+import com.kododake.aabrowser.data.BrowserPreferences
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
@@ -45,6 +46,17 @@ object AdBlocker {
     }
 
     private val sessionBlockCount = AtomicLong(0)
+
+    /** Hosts the user switched Shields off for; read on every request, so it is an immutable snapshot. */
+    @Volatile
+    private var siteAllowlist: Set<String> = emptySet()
+
+    /** Re-reads the per-site allowlist from preferences (cheap; call after the user toggles a site). */
+    fun refreshSiteAllowlist(context: Context) {
+        siteAllowlist = BrowserPreferences.getShieldsDisabledHosts(context)
+    }
+
+    fun isSiteAllowlisted(host: String?): Boolean = FilterEngine.hostWithinAny(host, siteAllowlist)
 
     val blockedThisSession: Long
         get() = sessionBlockCount.get()
@@ -89,6 +101,7 @@ object AdBlocker {
         if (!startLoader) return
 
         loader.execute {
+            refreshSiteAllowlist(appContext)
             val replacement = loadEngine(appContext)
             val callbacks: List<() -> Unit>
             synchronized(this) {
@@ -109,6 +122,7 @@ object AdBlocker {
 
     /** Rebuilds the immutable engine after subscription or cache changes. */
     fun reload(context: Context) {
+        refreshSiteAllowlist(context.applicationContext)
         val replacement = loadEngine(context.applicationContext)
         synchronized(this) {
             engine = replacement
@@ -188,7 +202,7 @@ object AdBlocker {
 
     fun scriptletInvocations(pageUrl: String?): List<FilterEngine.ScriptletInvocation> {
         val current = engine
-        if (current.pagePolicy(pageUrl).document) return emptyList()
+        if (isSiteAllowlisted(FilterEngine.hostOf(pageUrl)) || current.pagePolicy(pageUrl).document) return emptyList()
         return current.scriptletsFor(pageUrl)
     }
 
@@ -207,6 +221,9 @@ object AdBlocker {
         val scheme = requestUrl.scheme?.lowercase(Locale.ROOT)
         if (scheme != "http" && scheme != "https") return null
         val current = engine
+        // With no page context (service worker) the request's own site stands in for the page.
+        val siteHost = pageHost ?: FilterEngine.hostOf(pageUrl) ?: requestUrl.host
+        if (isSiteAllowlisted(siteHost)) return null
         if (pageUrl != null && current.pagePolicy(pageUrl).document) return null
         if (!current.shouldBlock(FilterEngine.Request(
                 url = requestUrl.toString(),
@@ -227,6 +244,7 @@ object AdBlocker {
      */
     fun cosmeticInitJson(pageUrl: String?): String {
         val current = engine
+        if (isSiteAllowlisted(FilterEngine.hostOf(pageUrl))) return ""
         val policy = current.pagePolicy(pageUrl)
         if (policy.hidesNothing) return ""
         val init = current.cosmeticInit(pageUrl, allowGeneric = policy.allowGeneric, allowSpecific = policy.allowSpecific) ?: return ""
@@ -247,7 +265,7 @@ object AdBlocker {
         val ids = parseTokenArray(idsJson)
         if (classes.isEmpty() && ids.isEmpty()) return ""
         val current = engine
-        if (!current.pagePolicy(pageUrl).allowGeneric) return ""
+        if (isSiteAllowlisted(host) || !current.pagePolicy(pageUrl).allowGeneric) return ""
         val selectors = current.genericSelectorsFor(classes, ids, host)
         return if (selectors.isEmpty()) "" else org.json.JSONArray(selectors).toString()
     }

@@ -12,6 +12,7 @@ import com.kododake.aabrowser.bookmarks.BookmarkManager
 import com.kododake.aabrowser.startpage.StartPageManager
 import com.kododake.aabrowser.tabs.TabManager
 import com.kododake.aabrowser.navigation.NavigationManager
+import com.kododake.aabrowser.web.adblock.AdBlocker
 
 class MainActivitySetup(
     private val activity: MainActivity,
@@ -113,6 +114,16 @@ class MainActivitySetup(
         
         binding.buttonSettings.setOnClickListener {
             managers.overlayManager.showSettingsView()
+        }
+
+        binding.buttonShieldsSite.setOnClickListener {
+            val host = managers.uiManager.shieldsSiteHost() ?: return@setOnClickListener
+            val disable = !BrowserPreferences.isShieldsDisabledForHost(activity, host)
+            BrowserPreferences.setShieldsDisabledForHost(activity, host, disable)
+            AdBlocker.refreshSiteAllowlist(activity)
+            managers.uiManager.refreshShieldsSiteButton()
+            managers.uiManager.hideMenuOverlay()
+            managers.tabManager.activeTab?.webView?.reload()
         }
         
         binding.buttonCheckLatest.setOnClickListener {
