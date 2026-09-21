@@ -16,9 +16,15 @@ class FilterEngine private constructor(
     private val unindexedBlockingRules: List<NetworkRule>
     private val indexedExceptionRules: Map<String, List<NetworkRule>>
     private val unindexedExceptionRules: List<NetworkRule>
-    private val globalCosmeticRules: List<CosmeticRule>
     private val cosmeticRulesByDomain: Map<String, List<CosmeticRule>>
     private val entityCosmeticRules: List<CosmeticRule>
+    /** Generic (domain-less) hide rules keyed by the class or id their leading compound selector requires. */
+    private val genericByClass: Map<String, List<CosmeticRule>>
+    private val genericById: Map<String, List<CosmeticRule>>
+    /** Generic hide rules that cannot be keyed (tag or attribute selectors); applied to every page. */
+    private val genericOther: List<CosmeticRule>
+    /** Selectors excepted everywhere by a domain-less `#@#` rule. */
+    private val globalCosmeticExceptions: Set<String>
     private val globalScriptletRules: List<ScriptletRule>
     private val scriptletRulesByDomain: Map<String, List<ScriptletRule>>
     private val entityScriptletRules: List<ScriptletRule>
@@ -39,12 +45,21 @@ class FilterEngine private constructor(
         indexedExceptionRules = exceptions
         unindexedExceptionRules = exceptionsUnindexed
 
-        val globalCosmetic = ArrayList<CosmeticRule>()
         val cosmeticByDomain = HashMap<String, MutableList<CosmeticRule>>()
         val entityCosmetic = ArrayList<CosmeticRule>()
+        val byClass = HashMap<String, MutableList<CosmeticRule>>()
+        val byId = HashMap<String, MutableList<CosmeticRule>>()
+        val other = ArrayList<CosmeticRule>()
+        val globalExceptions = HashSet<String>()
         cosmeticRules.forEach { rule ->
-            if (rule.includedDomains.isEmpty()) globalCosmetic += rule
-            else {
+            if (rule.includedDomains.isEmpty()) {
+                when {
+                    rule.exception -> globalExceptions += rule.selector
+                    rule.keyKind == KEY_CLASS -> byClass.getOrPut(rule.key!!) { ArrayList() } += rule
+                    rule.keyKind == KEY_ID -> byId.getOrPut(rule.key!!) { ArrayList() } += rule
+                    else -> other += rule
+                }
+            } else {
                 var hasEntity = false
                 rule.includedDomains.forEach { domain ->
                     if (domain.endsWith(".*")) hasEntity = true
@@ -53,9 +68,12 @@ class FilterEngine private constructor(
                 if (hasEntity) entityCosmetic += rule
             }
         }
-        globalCosmeticRules = globalCosmetic
         cosmeticRulesByDomain = cosmeticByDomain
         entityCosmeticRules = entityCosmetic
+        genericByClass = byClass
+        genericById = byId
+        genericOther = other
+        globalCosmeticExceptions = globalExceptions
 
         val globalScriptlets = ArrayList<ScriptletRule>()
         val scriptletsByDomain = HashMap<String, MutableList<ScriptletRule>>()
@@ -109,17 +127,59 @@ class FilterEngine private constructor(
         return matchesIndexed(request.url, indexedBlockingRules, context)
     }
 
-    fun cosmeticCss(pageUrl: String?): String {
-        val host = hostOf(pageUrl) ?: return ""
-        val hidden = LinkedHashSet<String>()
-        val exceptions = HashSet<String>()
-        domainCandidates(host, globalCosmeticRules, cosmeticRulesByDomain, entityCosmeticRules).forEach { rule ->
-            if (rule.appliesTo(host)) {
-                if (rule.exception) exceptions += rule.selector else hidden += rule.selector
+    /**
+     * Everything the document-start script needs before the page renders: the site-specific hide
+     * selectors, the un-keyed generic selectors, and whether keyed generic rules should be
+     * requested as the page's classes and ids are discovered (see [genericSelectorsFor]).
+     */
+    data class CosmeticInit(val specific: List<String>, val other: List<String>, val generic: Boolean)
+
+    fun cosmeticInit(pageUrl: String?, allowGeneric: Boolean = true): CosmeticInit? {
+        val host = hostOf(pageUrl) ?: return null
+        val exceptions = cosmeticExceptionsFor(host)
+        val specific = LinkedHashSet<String>()
+        domainCandidates(host, emptyList(), cosmeticRulesByDomain, entityCosmeticRules).forEach { rule ->
+            if (!rule.exception && rule.appliesTo(host) && rule.selector !in exceptions) specific += rule.selector
+        }
+        val other = if (allowGeneric) {
+            genericOther.asSequence()
+                .filter { it.appliesTo(host) && it.selector !in exceptions }
+                .mapTo(LinkedHashSet()) { it.selector }
+                .toList()
+        } else {
+            emptyList()
+        }
+        val hasKeyedGeneric = allowGeneric && (genericByClass.isNotEmpty() || genericById.isNotEmpty())
+        if (specific.isEmpty() && other.isEmpty() && !hasKeyedGeneric) return null
+        return CosmeticInit(specific.toList(), other, hasKeyedGeneric)
+    }
+
+    /**
+     * Generic hide selectors whose leading class or id is among the [classes] / [ids] present on the
+     * page. Only rules keyed by one of those tokens are consulted, so the cost is proportional to
+     * the page, not to the size of the filter lists.
+     */
+    fun genericSelectorsFor(classes: Collection<String>, ids: Collection<String>, pageHost: String?): List<String> {
+        val host = pageHost?.let(::normalizeHost)?.takeIf { it.isNotEmpty() } ?: return emptyList()
+        val exceptions = cosmeticExceptionsFor(host)
+        val out = LinkedHashSet<String>()
+        fun collect(rules: List<CosmeticRule>?) {
+            rules?.forEach { if (it.appliesTo(host) && it.selector !in exceptions) out += it.selector }
+        }
+        classes.forEach { collect(genericByClass[it]) }
+        ids.forEach { collect(genericById[it]) }
+        return out.toList()
+    }
+
+    /** Selectors that must not be hidden on [host]: global `#@#` rules plus the site's own exceptions. */
+    private fun cosmeticExceptionsFor(host: String): Set<String> {
+        var exceptions: MutableSet<String>? = null
+        domainCandidates(host, emptyList(), cosmeticRulesByDomain, entityCosmeticRules).forEach { rule ->
+            if (rule.exception && rule.appliesTo(host)) {
+                (exceptions ?: HashSet(globalCosmeticExceptions).also { exceptions = it }) += rule.selector
             }
         }
-        hidden.removeAll(exceptions)
-        return hidden.joinToString(",\n") { "$it { display: none !important; }" }
+        return exceptions ?: globalCosmeticExceptions
     }
 
     fun scriptletsFor(pageUrl: String?): List<ScriptletInvocation> {
@@ -233,6 +293,24 @@ class FilterEngine private constructor(
     }
 
     companion object {
+        internal const val KEY_NONE = 0
+        internal const val KEY_CLASS = 1
+        internal const val KEY_ID = 2
+        private val GENERIC_KEY = Regex("^(?:[A-Za-z][\\w-]*)?([.#])([A-Za-z_-][\\w-]*)")
+
+        /**
+         * Finds the class or id an element must carry for [selector] to match, looking only at the
+         * leading compound (`.ad`, `div.ad > a`, `#banner .x`). Selectors starting with a tag,
+         * attribute or wildcard, or whose identifier is cut short by a CSS escape, get [KEY_NONE].
+         */
+        internal fun genericKey(selector: String): Pair<Int, String?> {
+            val match = GENERIC_KEY.find(selector) ?: return KEY_NONE to null
+            val end = match.range.last + 1
+            if (end < selector.length && selector[end] == '\\') return KEY_NONE to null
+            val kind = if (match.groupValues[1] == ".") KEY_CLASS else KEY_ID
+            return kind to match.groupValues[2]
+        }
+
         private const val PATTERN_HOST = 1
         private const val PATTERN_REGEX = 2
         private const val PATTERN_LITERAL = 3
@@ -241,7 +319,9 @@ class FilterEngine private constructor(
         private const val MAX_SNAPSHOT_STRING_BYTES = 16 * 1024 * 1024
         private val UNSUPPORTED_COSMETIC_OPERATORS = arrayOf(
             ":has-text(", ":matches-css(", ":matches-attr(", ":remove(",
-            ":style(", ":upward(", ":xpath(", ":others(", ":watch-attr("
+            ":style(", ":upward(", ":xpath(", ":others(", ":watch-attr(",
+            ":matches-path(", ":min-text-length(", ":nth-ancestor(", ":remove-attr(",
+            ":remove-class(", ":matches-media(", ":matches-prop(", ":if(", ":if-not(", ":shadow("
         )
         private val UNHELPFUL_TOKENS = setOf("http", "https", "html", "com", "org", "net")
         private val TYPE_OPTIONS = mapOf(
@@ -831,6 +911,15 @@ class FilterEngine private constructor(
         val selector: String, val exception: Boolean,
         val includedDomains: Set<String>, val excludedDomains: Set<String>
     ) {
+        val keyKind: Int
+        val key: String?
+
+        init {
+            val (kind, value) = if (includedDomains.isEmpty() && !exception) genericKey(selector) else KEY_NONE to null
+            keyKind = kind
+            key = value
+        }
+
         fun appliesTo(host: String): Boolean {
             if (excludedDomains.any { hostMatches(host, it) }) return false
             return includedDomains.isEmpty() || includedDomains.any { hostMatches(host, it) }

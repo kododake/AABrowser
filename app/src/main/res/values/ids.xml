@@ -4,6 +4,7 @@
     <item name="settings_filter_list_update_button" type="id" />
     <item name="webview_ubo_scriptlet_handler_tag" type="id" />
     <item name="webview_ubo_scriptlet_bridge_tag" type="id" />
+    <item name="webview_cosmetic_handler_tag" type="id" />
     <item name="webview_original_user_agent_tag" type="id" />
     <item name="webview_allow_once_uri_tag" type="id" />
     <item name="webview_pending_shields_url_tag" type="id" />

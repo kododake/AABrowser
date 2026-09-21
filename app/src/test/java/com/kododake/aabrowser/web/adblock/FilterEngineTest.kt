@@ -30,7 +30,7 @@ class FilterEngineTest {
         assertFalse(restored.blocks("https://ads.test/allowed.js", "https://news.test", FilterEngine.ResourceType.SCRIPT))
         assertTrue(restored.blocks("https://literal.test/tracker.js"))
         assertTrue(restored.blocks("https://cdn.test/pixel-42.gif"))
-        assertTrue(".advert" in restored.cosmeticCss("https://news.test"))
+        assertTrue(".advert" in restored.hiddenOn("https://news.test"))
         assertTrue(restored.scriptletsFor("https://news.test").single().name == "set-constant")
     }
 
@@ -125,13 +125,74 @@ class FilterEngineTest {
             "news.test#@#.generic-ad",
             "~shop.news.test,news.test##.newsletter"
         )
-        val newsCss = engine.cosmeticCss("https://news.test/article")
-        assertTrue(".sponsor" in newsCss)
-        assertTrue(".newsletter" in newsCss)
-        assertFalse(".generic-ad" in newsCss)
+        val news = engine.hiddenOn("https://news.test/article", classes = listOf("generic-ad"))
+        assertTrue(".sponsor" in news)
+        assertTrue(".newsletter" in news)
+        assertFalse(".generic-ad" in news)
 
-        val shopCss = engine.cosmeticCss("https://shop.news.test")
-        assertFalse(".newsletter" in shopCss)
+        val shop = engine.hiddenOn("https://shop.news.test", classes = listOf("generic-ad"))
+        assertFalse(".newsletter" in shop)
+        assertFalse(".generic-ad" in shop) // the news.test exception covers its subdomains
+
+        val other = engine.hiddenOn("https://other.test", classes = listOf("generic-ad"))
+        assertTrue(".generic-ad" in other)
+        assertFalse(".sponsor" in other)
+    }
+
+    @Test
+    fun `generic rules are keyed by their leading class or id`() {
+        assertTrue(FilterEngine.genericKey(".ad-banner") == FilterEngine.KEY_CLASS to "ad-banner")
+        assertTrue(FilterEngine.genericKey("div.ad > a") == FilterEngine.KEY_CLASS to "ad")
+        assertTrue(FilterEngine.genericKey("#sponsor .item") == FilterEngine.KEY_ID to "sponsor")
+        assertTrue(FilterEngine.genericKey(".promo:not(.keep)") == FilterEngine.KEY_CLASS to "promo")
+        assertTrue(FilterEngine.genericKey("[href^=\"//ads.\"]").first == FilterEngine.KEY_NONE)
+        assertTrue(FilterEngine.genericKey("iframe[src*=\"doubleclick\"]").first == FilterEngine.KEY_NONE)
+        assertTrue(FilterEngine.genericKey("*[data-ad]").first == FilterEngine.KEY_NONE)
+        assertTrue(FilterEngine.genericKey(".ad\\:wide").first == FilterEngine.KEY_NONE)
+    }
+
+    @Test
+    fun `keyed generic selectors are only returned for tokens present on the page`() {
+        val engine = engine(
+            "##.ad-banner",
+            "##div.promo > a",
+            "###sidebar-ad",
+            "##iframe[src*=\"doubleclick\"]",
+            "~keep.test##.tracking-pixel",
+            "#@#.ad-banner",
+            "site.test#@#.tracking-pixel"
+        )
+        val init = engine.cosmeticInit("https://site.test/page")!!
+        assertTrue(init.generic)
+        assertTrue(init.specific.isEmpty())
+        assertTrue(init.other == listOf("iframe[src*=\"doubleclick\"]"))
+
+        val found = engine.genericSelectorsFor(listOf("promo", "tracking-pixel", "ad-banner"), listOf("sidebar-ad"), "site.test")
+        assertTrue("div.promo > a" in found)
+        assertTrue("#sidebar-ad" in found)
+        assertFalse(".ad-banner" in found)
+        assertFalse(".tracking-pixel" in found)
+        assertTrue(engine.genericSelectorsFor(listOf("tracking-pixel"), emptyList(), "other.test") == listOf(".tracking-pixel"))
+        assertTrue(engine.genericSelectorsFor(listOf("tracking-pixel"), emptyList(), "keep.test").isEmpty())
+        assertTrue(engine.genericSelectorsFor(listOf("nothing"), listOf("nothing"), "site.test").isEmpty())
+    }
+
+    @Test
+    fun `cosmetic init can withhold generic rules and reports when nothing applies`() {
+        val engine = engine("##.ad-banner", "news.test##.sponsor")
+        val withoutGeneric = engine.cosmeticInit("https://news.test", allowGeneric = false)!!
+        assertFalse(withoutGeneric.generic)
+        assertTrue(withoutGeneric.specific == listOf(".sponsor"))
+        assertTrue(withoutGeneric.other.isEmpty())
+        assertTrue(engine.cosmeticInit("https://other.test", allowGeneric = false) == null)
+        assertTrue(engine.cosmeticInit("file:///android_asset/error.html") == null)
+        assertTrue(engine("||ads.test^").cosmeticInit("https://news.test") == null)
+    }
+
+    @Test
+    fun `procedural cosmetic operators are rejected`() {
+        val engine = engine("##.ad:has-text(Sponsored)", "##.ad:matches-path(/news)", "##.ad:if(.x)", "##.plain")
+        assertTrue(engine.genericSelectorsFor(listOf("ad", "plain"), emptyList(), "site.test") == listOf(".plain"))
     }
 
     @Test
@@ -250,6 +311,17 @@ class FilterEngineTest {
     }
 
     private fun engine(vararg rules: String) = FilterEngine.parse(rules.asSequence())
+
+    /** Every selector the document-start script would hide on [url] given the page's [classes]/[ids]. */
+    private fun FilterEngine.hiddenOn(
+        url: String,
+        classes: List<String> = emptyList(),
+        ids: List<String> = emptyList()
+    ): List<String> {
+        val init = cosmeticInit(url) ?: return emptyList()
+        val generic = if (init.generic) genericSelectorsFor(classes, ids, FilterEngine.hostOf(url)) else emptyList()
+        return init.specific + init.other + generic
+    }
 
     private fun FilterEngine.blocks(
         url: String,

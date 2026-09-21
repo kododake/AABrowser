@@ -26,7 +26,7 @@ import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.web.adblock.AdBlocker
-import com.kododake.aabrowser.web.adblock.UboScriptletRuntime
+import com.kododake.aabrowser.web.adblock.ShieldsRuntime
 
 data class BrowserCallbacks(
     val onUrlChange: (String) -> Unit = {},
@@ -101,7 +101,7 @@ fun configureWebView(
         // loadUrlWhenShieldsReady, so no page requests can bypass the engine.
         setTag(R.id.webview_shields_enabled_tag, shieldsEnabled)
         if (shieldsEnabled.get()) AdBlocker.ensureLoadedAsync(appContext)
-        UboScriptletRuntime.install(this, shieldsEnabled.get())
+        ShieldsRuntime.install(this, shieldsEnabled.get())
 
         CookieManager.getInstance().also {
             it.setAcceptCookie(true)
@@ -115,6 +115,13 @@ fun configureWebView(
                 view: WebView,
                 request: WebResourceRequest
             ): WebResourceResponse? {
+                if (request.isForMainFrame) {
+                    // Redirects and the first subresources arrive before onPageStarted; keep the
+                    // page context current so third-party checks use the right host.
+                    val target = request.url
+                    currentPageUrl.set(target?.toString())
+                    currentPageHost.set(target?.host)
+                }
                 if (!shieldsEnabled.get()) {
                     return null
                 }
@@ -151,7 +158,7 @@ fun configureWebView(
                 currentPageUrl.set(url)
                 currentPageHost.set(url?.toUri()?.host)
                 if (shieldsEnabled.get()) {
-                    UboScriptletRuntime.runFallbackIfNeeded(view)
+                    ShieldsRuntime.runFallbackIfNeeded(view)
                 }
                 val stringUrl = url
                 if (stringUrl == null) {
@@ -175,9 +182,6 @@ fun configureWebView(
                 currentPageUrl.set(url)
                 currentPageHost.set(url?.toUri()?.host)
                 view.evaluateJavascript(SpeechRecognitionBridge.POLYFILL_JS, null)
-                if (shieldsEnabled.get()) {
-                    AdBlocker.cosmeticScript(url)?.let { view.evaluateJavascript(it, null) }
-                }
                 url?.let(callbacks.onUrlChange)
             }
 
@@ -420,14 +424,14 @@ fun WebView.updateShieldsEnabled(enabled: Boolean) {
         }
     state.set(enabled)
     if (!enabled) {
-        UboScriptletRuntime.install(this, false)
+        ShieldsRuntime.install(this, false)
         reload()
         return
     }
     val target = this
     AdBlocker.runWhenLoaded(context.applicationContext) {
         if (state.get() && target.parent != null) {
-            UboScriptletRuntime.install(target, true)
+            ShieldsRuntime.install(target, true)
             target.reload()
         }
     }
@@ -435,7 +439,7 @@ fun WebView.updateShieldsEnabled(enabled: Boolean) {
 
 fun WebView.releaseCompletely() {
     stopLoading()
-    UboScriptletRuntime.uninstall(this)
+    ShieldsRuntime.uninstall(this)
     (parent as? android.view.ViewGroup)?.removeView(this)
     removeAllViews()
     webChromeClient = null

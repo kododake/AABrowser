@@ -21,7 +21,8 @@ import java.util.concurrent.atomic.AtomicLong
 object AdBlocker {
     private const val FILTERS_ASSET = "adblock/blocklist.txt"
     private const val CACHE_MAGIC = 0x41414246
-    private const val CACHE_VERSION = 1
+    private const val CACHE_VERSION = 2
+    private const val MAX_BRIDGE_TOKENS = 512
     private const val MAX_CACHE_BYTES = 256L * 1024 * 1024
 
     @Volatile
@@ -136,6 +137,7 @@ object AdBlocker {
 
     private fun readCachedEngine(context: Context, fingerprint: String): FilterEngine? = runCatching {
         val file = engineCacheFile(context)
+        deleteStaleCaches(file)
         if (!file.isFile || file.length() !in 1..MAX_CACHE_BYTES) return@runCatching null
         DataInputStream(BufferedInputStream(file.inputStream())).use { input ->
             if (input.readInt() != CACHE_MAGIC || input.readInt() != CACHE_VERSION ||
@@ -177,6 +179,13 @@ object AdBlocker {
     private fun engineCacheFile(context: Context) =
         File(context.filesDir, "adblock/compiled-engine-$CACHE_VERSION.bin")
 
+    /** Snapshots written by earlier app versions use an older format; free the space. */
+    private fun deleteStaleCaches(current: File) {
+        current.parentFile?.listFiles()?.forEach { file ->
+            if (file != current && file.name.startsWith("compiled-engine-") && file.name.endsWith(".bin")) file.delete()
+        }
+    }
+
     fun scriptletInvocations(pageUrl: String?): List<FilterEngine.ScriptletInvocation> =
         engine.scriptletsFor(pageUrl)
 
@@ -202,22 +211,42 @@ object AdBlocker {
         return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
     }
 
-    fun cosmeticScript(pageUrl: String?): String? {
-        val css = engine.cosmeticCss(pageUrl)
-        if (css.isBlank()) return null
-        val quotedCss = org.json.JSONObject.quote(css)
-        return """
-            (() => {
-              const id = '__aabrowser_cosmetic_filters';
-              let style = document.getElementById(id);
-              if (!style) {
-                style = document.createElement('style');
-                style.id = id;
-                (document.head || document.documentElement).appendChild(style);
-              }
-              style.textContent = $quotedCss;
-            })();
-        """.trimIndent()
+    /**
+     * JSON for the document-start cosmetic script: `{"s":[...],"o":[...],"g":true}` with the site's
+     * specific hide selectors, the un-keyed generic selectors, and whether keyed generic rules
+     * should be requested; an empty string when nothing applies to [pageUrl].
+     */
+    fun cosmeticInitJson(pageUrl: String?): String {
+        val init = engine.cosmeticInit(pageUrl) ?: return ""
+        return org.json.JSONObject()
+            .put("s", org.json.JSONArray(init.specific))
+            .put("o", org.json.JSONArray(init.other))
+            .put("g", init.generic)
+            .toString()
+    }
+
+    /**
+     * JSON array of generic hide selectors keyed by the given page classes/ids (JSON arrays of
+     * strings, capped so a hostile page cannot make the bridge do unbounded work).
+     */
+    fun genericSelectorsJson(pageUrl: String?, classesJson: String?, idsJson: String?): String {
+        val host = FilterEngine.hostOf(pageUrl) ?: return ""
+        val classes = parseTokenArray(classesJson)
+        val ids = parseTokenArray(idsJson)
+        if (classes.isEmpty() && ids.isEmpty()) return ""
+        val selectors = engine.genericSelectorsFor(classes, ids, host)
+        return if (selectors.isEmpty()) "" else org.json.JSONArray(selectors).toString()
+    }
+
+    private fun parseTokenArray(json: String?): List<String> {
+        if (json.isNullOrEmpty()) return emptyList()
+        val array = runCatching { org.json.JSONArray(json) }.getOrNull() ?: return emptyList()
+        val out = ArrayList<String>(minOf(array.length(), MAX_BRIDGE_TOKENS))
+        for (index in 0 until minOf(array.length(), MAX_BRIDGE_TOKENS)) {
+            val token = array.optString(index, "")
+            if (token.isNotEmpty() && token.length <= 128) out += token
+        }
+        return out
     }
 
     private fun inferResourceType(uri: Uri, headers: Map<String, String>): FilterEngine.ResourceType {
