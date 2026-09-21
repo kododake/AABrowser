@@ -39,6 +39,8 @@ import com.kododake.aabrowser.model.AppThemeMode
 import com.kododake.aabrowser.model.QuickActionButtonMode
 import com.kododake.aabrowser.model.QuickActionButtonPosition
 import com.kododake.aabrowser.model.UserAgentProfile
+import com.kododake.aabrowser.web.adblock.AdBlocker
+import com.kododake.aabrowser.web.adblock.RemoteFilterListManager
 
 data class SettingsCallbacks(
     val onClose: () -> Unit = {},
@@ -49,7 +51,8 @@ data class SettingsCallbacks(
     val onInAppControlsChanged: () -> Unit = {},
     val onPickStartPageBackground: (() -> Unit)? = null,
     val onClearStartPageBackground: (() -> Unit)? = null,
-    val onSponsorsVisibilityChanged: () -> Unit = {}
+    val onSponsorsVisibilityChanged: () -> Unit = {},
+    val onShieldsChanged: () -> Unit = {}
 )
 
 object SettingsViews {
@@ -846,6 +849,177 @@ object SettingsViews {
         startPageCard.addView(startPageInner)
         container.addView(startPageCard)
 
+        val shieldsCard = createStyledCard()
+        val shieldsInner = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(16), dp(8), dp(16))
+        }
+        shieldsInner.addView(
+            createSectionTitle(
+                context.getString(R.string.settings_shields),
+                R.drawable.security_24px,
+                bottomPaddingDp = 4
+            )
+        )
+
+        fun shieldsStatusText(enabled: Boolean): String = if (enabled) {
+            context.getString(R.string.settings_shields_blocked_count, AdBlocker.blockedThisSession.toInt())
+        } else {
+            context.getString(R.string.settings_shields_disabled)
+        }
+
+        val shieldsStatusView = TextView(context).apply {
+            text = shieldsStatusText(BrowserPreferences.isShieldsEnabled(context))
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            setTextColor(onSurfaceVariantColor)
+            setPadding(dp(12), 0, dp(12), dp(8))
+        }
+        shieldsInner.addView(shieldsStatusView)
+
+        val shieldsRow = createSettingSwitchRow(
+            title = context.getString(R.string.settings_shields_title),
+            description = context.getString(R.string.settings_shields_description),
+            iconRes = R.drawable.security_24px,
+            isCheckedValue = BrowserPreferences.isShieldsEnabled(context)
+        ) { isChecked ->
+            BrowserPreferences.setShieldsEnabled(context, isChecked)
+            shieldsStatusView.text = shieldsStatusText(isChecked)
+            callbacks.onShieldsChanged()
+        }
+        shieldsInner.addView(shieldsRow)
+
+        val filterListsStatus = TextView(context).apply {
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            setTextColor(onSurfaceVariantColor)
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+        fun updateFilterListsStatus() {
+            val lists = RemoteFilterListManager.subscriptions(context)
+            val enabled = lists.count { it.enabled }
+            val rules = lists.filter { it.enabled }.sumOf { it.ruleCount }
+            filterListsStatus.text = context.getString(R.string.settings_filter_lists_summary, enabled, lists.size, rules)
+        }
+        updateFilterListsStatus()
+        shieldsInner.addView(filterListsStatus)
+
+        lateinit var showManageLists: () -> Unit
+        val showAddCustomList = {
+            val form = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(20), 0, dp(20), 0)
+            }
+            val nameLayout = TextInputLayout(context).apply { hint = context.getString(R.string.settings_filter_list_name) }
+            val nameInput = TextInputEditText(context).apply { inputType = InputType.TYPE_CLASS_TEXT }
+            nameLayout.addView(nameInput)
+            form.addView(nameLayout)
+            val urlLayout = TextInputLayout(context).apply { hint = context.getString(R.string.settings_filter_list_url) }
+            val urlInput = TextInputEditText(context).apply {
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            }
+            urlLayout.addView(urlInput)
+            form.addView(urlLayout)
+            val dialog = MaterialAlertDialogBuilder(context, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
+                .setTitle(R.string.settings_filter_lists_add)
+                .setView(form)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.settings_action_add, null)
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    val url = urlInput.text?.toString().orEmpty()
+                    val result = runCatching {
+                        RemoteFilterListManager.addCustom(context, nameInput.text?.toString().orEmpty(), url)
+                    }
+                    if (result.isFailure) {
+                        urlLayout.error = result.exceptionOrNull()?.message ?: context.getString(R.string.settings_filter_list_invalid)
+                    } else {
+                        dialog.dismiss()
+                        updateFilterListsStatus()
+                        Toast.makeText(context, R.string.settings_filter_lists_updating, Toast.LENGTH_SHORT).show()
+                        RemoteFilterListManager.refresh(context, force = true) { update ->
+                            updateFilterListsStatus()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_filter_lists_update_result, update.updated, update.failed),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            }
+            dialog.show()
+        }
+        showManageLists = {
+            val lists = RemoteFilterListManager.subscriptions(context)
+            val checked = BooleanArray(lists.size) { lists[it].enabled }
+            val labels = lists.map { item ->
+                val suffix = when {
+                    item.lastError != null -> context.getString(R.string.settings_filter_list_failed)
+                    item.ruleCount > 0 -> context.getString(R.string.settings_filter_list_rules, item.ruleCount)
+                    else -> context.getString(R.string.settings_filter_list_not_downloaded)
+                }
+                "${item.title} · $suffix"
+            }.toTypedArray()
+            MaterialAlertDialogBuilder(context, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
+                .setTitle(R.string.settings_filter_lists_manage)
+                .setMultiChoiceItems(labels, checked) { _, which, enabled -> checked[which] = enabled }
+                .setNegativeButton(android.R.string.cancel, null)
+                .setNeutralButton(R.string.settings_filter_lists_remove) { _, _ ->
+                    val custom = lists.filterNot { it.builtIn }
+                    if (custom.isEmpty()) {
+                        Toast.makeText(context, R.string.settings_filter_lists_no_custom, Toast.LENGTH_SHORT).show()
+                    } else {
+                        MaterialAlertDialogBuilder(context, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
+                            .setTitle(R.string.settings_filter_lists_remove)
+                            .setItems(custom.map { it.title }.toTypedArray()) { _, which ->
+                                RemoteFilterListManager.removeCustomAsync(context, custom[which].id) {
+                                    updateFilterListsStatus()
+                                }
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                    }
+                }
+                .setPositiveButton(R.string.settings_action_save) { _, _ ->
+                    val enabledIds = lists.indices.filter { checked[it] }.mapTo(HashSet()) { lists[it].id }
+                    RemoteFilterListManager.setEnabledAsync(context, enabledIds) { updateFilterListsStatus() }
+                }
+                .show()
+        }
+        shieldsInner.addView(createSettingRow(
+            title = context.getString(R.string.settings_filter_lists_manage),
+            statusText = context.getString(R.string.settings_filter_lists_manage_description),
+            iconRes = R.drawable.public_24px,
+            onClick = { showManageLists() }
+        ))
+        shieldsInner.addView(createListButton(
+            R.id.settings_filter_list_add_button,
+            context.getString(R.string.settings_filter_lists_add),
+            R.drawable.arrow_forward_24px
+        ).apply { setOnClickListener { showAddCustomList() } })
+        shieldsInner.addView(createListButton(
+            R.id.settings_filter_list_update_button,
+            context.getString(R.string.settings_filter_lists_update),
+            R.drawable.refresh_24px
+        ).apply {
+            setOnClickListener {
+                isEnabled = false
+                Toast.makeText(context, R.string.settings_filter_lists_updating, Toast.LENGTH_SHORT).show()
+                RemoteFilterListManager.refresh(context, force = true) { result ->
+                    isEnabled = true
+                    updateFilterListsStatus()
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.settings_filter_lists_update_result, result.updated, result.failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        })
+
+        shieldsCard.addView(shieldsInner)
+        container.addView(shieldsCard)
+
         val uaCard = createStyledCard()
         val uaInner = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -1145,7 +1319,8 @@ object SettingsViews {
             onThemeChanged = { (context as? android.app.Activity)?.recreate() },
             onPageDarkeningChanged = { (context as? android.app.Activity)?.recreate() },
             onScaleChanged = { (context as? android.app.Activity)?.recreate() },
-            onHomePageChanged = { (context as? android.app.Activity)?.recreate() }
+            onHomePageChanged = { (context as? android.app.Activity)?.recreate() },
+            onShieldsChanged = { (context as? android.app.Activity)?.recreate() }
         )
     )
 }

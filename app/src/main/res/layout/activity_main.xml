@@ -14,6 +14,23 @@
         app:trackThickness="3dp"
         app:indicatorColor="?attr/colorPrimary" />
 
+    <TextView
+        android:id="@+id/loadingRulesLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="12dp"
+        android:background="?attr/colorSurfaceContainerHigh"
+        android:elevation="8dp"
+        android:paddingStart="16dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp"
+        android:text="@string/loading_adblock_rules"
+        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+        android:textColor="?attr/colorOnSurface"
+        android:visibility="gone" />
+
     <FrameLayout
         android:id="@+id/contentRoot"
         android:layout_width="match_parent"

@@ -13,6 +13,7 @@ import com.kododake.aabrowser.permissions.PermissionManager
 import com.kododake.aabrowser.startpage.StartPageManager
 import com.kododake.aabrowser.tabs.TabManager
 import com.kododake.aabrowser.ui.BrowserUIManager
+import com.kododake.aabrowser.web.loadUrlWhenShieldsReady
 
 class NavigationManager(
     private val activity: AppCompatActivity,
@@ -110,7 +111,7 @@ class NavigationManager(
                     finishNavigation {
                         targetWebView.setTag(R.id.webview_allow_once_uri_tag, navigable)
                         targetWebView.post { 
-                            targetWebView.loadUrl(navigable) 
+                            targetWebView.loadUrlWhenShieldsReady(navigable, ::showShieldsLoading)
                         }
                     }
                 },
@@ -121,7 +122,7 @@ class NavigationManager(
                     finishNavigation {
                         targetWebView.setTag(R.id.webview_allow_once_uri_tag, navigable)
                         targetWebView.post { 
-                            targetWebView.loadUrl(navigable) 
+                            targetWebView.loadUrlWhenShieldsReady(navigable, ::showShieldsLoading)
                         }
                     }
                 },
@@ -135,7 +136,13 @@ class NavigationManager(
         }
 
         finishNavigation { 
-            targetWebView.loadUrl(navigable) 
+            targetWebView.loadUrlWhenShieldsReady(navigable, ::showShieldsLoading)
         }
+    }
+
+    private fun showShieldsLoading(waiting: Boolean) {
+        binding.progressIndicator.isIndeterminate = waiting
+        binding.progressIndicator.isVisible = waiting
+        binding.loadingRulesLabel.isVisible = waiting
     }
 }

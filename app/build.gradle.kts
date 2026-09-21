@@ -100,6 +100,34 @@ tasks.withType<KotlinJvmCompile>().configureEach {
     }
 }
 
+// Optional: checks the generated uBO scriptlet runtime against the vendored upstream registry.
+// It needs Node.js, so it only runs when a `node` binary is available (or NODE_BINARY is set);
+// plain Android Studio builds and `./gradlew test` keep working without Node.
+val nodeBinary: String? = providers.environmentVariable("NODE_BINARY").orNull
+    ?: System.getenv("PATH").orEmpty().split(File.pathSeparatorChar)
+        .asSequence()
+        .map { File(it, if (System.getProperty("os.name").startsWith("Windows")) "node.exe" else "node") }
+        .firstOrNull { it.isFile && it.canExecute() }
+        ?.absolutePath
+
+val testUboScriptletCompatibility by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Checks the generated scriptlet runtime against the pinned upstream uBO registry (requires Node.js)."
+    workingDir(rootProject.projectDir)
+    onlyIf { nodeBinary != null }
+    commandLine(nodeBinary ?: "node", "scripts/test_ubo_scriptlet_compatibility.cjs")
+    inputs.file(rootProject.file("scripts/test_ubo_scriptlet_compatibility.cjs"))
+    inputs.file(rootProject.file("app/src/main/assets/adblock/ubo-scriptlets.js"))
+    inputs.dir(rootProject.file("third_party/ublock/src/js/resources"))
+    inputs.file(rootProject.file("third_party/ublock/README.md"))
+}
+
+if (nodeBinary != null) {
+    tasks.withType<Test>().configureEach { dependsOn(testUboScriptletCompatibility) }
+} else {
+    logger.lifecycle("Node.js not found: skipping testUboScriptletCompatibility")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

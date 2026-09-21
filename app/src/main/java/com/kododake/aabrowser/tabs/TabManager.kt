@@ -16,6 +16,7 @@ import com.kododake.aabrowser.databinding.ActivityMainBinding
 import com.kododake.aabrowser.ui.adapters.TabAdapter
 import com.kododake.aabrowser.web.BrowserCallbacks
 import com.kododake.aabrowser.web.configureWebView
+import com.kododake.aabrowser.web.loadUrlWhenShieldsReady
 import com.kododake.aabrowser.web.releaseCompletely
 import com.kododake.aabrowser.web.updateDesktopMode
 
@@ -253,7 +254,7 @@ class TabManager(
         } else {
             callbacks.onHideStartPage()
             if (selectedTab.webView.url.isNullOrBlank()) {
-                selectedTab.webView.loadUrl(selectedTab.currentUrl)
+                selectedTab.webView.loadUrlWhenShieldsReady(selectedTab.currentUrl, ::showShieldsLoading)
             } else {
                 binding.pageTitle.text = selectedTab.currentTitle.ifBlank { displayTitleForTab(selectedTab) }
                 callbacks.updateConnectionSecurityIcon(selectedTab.currentUrl)
@@ -265,6 +266,12 @@ class TabManager(
         callbacks.updateNavigationButtons()
         callbacks.applyPersistentAddressBarPreference()
         callbacks.onTabChanged(selectedTab)
+    }
+
+    private fun showShieldsLoading(waiting: Boolean) {
+        binding.progressIndicator.isIndeterminate = waiting
+        binding.progressIndicator.visibility = if (waiting) View.VISIBLE else View.GONE
+        binding.loadingRulesLabel.visibility = if (waiting) View.VISIBLE else View.GONE
     }
 
     fun closeTab(tabId: Long, onSpeechTabClosed: () -> Unit) {

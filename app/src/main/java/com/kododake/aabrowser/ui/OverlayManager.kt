@@ -19,6 +19,7 @@ import com.kododake.aabrowser.settings.SettingsViews
 import com.kododake.aabrowser.startpage.StartPageManager
 import com.kododake.aabrowser.tabs.TabManager
 import com.kododake.aabrowser.web.updatePageDarkening
+import com.kododake.aabrowser.web.updateShieldsEnabled
 
 class OverlayManager(
     private val activity: AppCompatActivity,
@@ -144,6 +145,12 @@ class OverlayManager(
                 },
                 onSponsorsVisibilityChanged = {
                     startPageManager.refreshStartPage()
+                },
+                onShieldsChanged = {
+                    val enabled = BrowserPreferences.isShieldsEnabled(activity)
+                    tabManager.browserTabs.forEach { tab ->
+                        tab.webView.updateShieldsEnabled(enabled)
+                    }
                 }
             )
             
