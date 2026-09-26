@@ -198,7 +198,8 @@ fun SettingsScreen(
 
                     PrivacyAndAboutComposable(
                         context = context,
-                        onDrmL3EnforcerChanged = callbacks.onDrmL3EnforcerChanged
+                        onDrmL3EnforcerChanged = callbacks.onDrmL3EnforcerChanged,
+                        onUserAgentChanged = callbacks.onUserAgentChanged
                     )
 
                     Spacer(Modifier.height(32.dp))

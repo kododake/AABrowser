@@ -28,6 +28,7 @@ import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.databinding.ActivityMainBinding
 import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.ui.compose.screens.tabs.TabItemUi
+import com.kododake.aabrowser.web.UserAgentManager
 import com.kododake.aabrowser.web.releaseCompletely
 import com.kododake.aabrowser.web.updateDesktopMode
 import com.kododake.aabrowser.web.updateUserAgentProfile
@@ -287,6 +288,8 @@ class TabManager(
     }
 
     fun updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
-        browserTabs.forEach { tab -> tab.webView.updateUserAgentProfile(profile, desktop) }
+        browserTabs
+            .filterNot { tab -> UserAgentManager.isBrowserIdentityApplied(tab.webView, profile, desktop) }
+            .forEach { tab -> tab.webView.updateUserAgentProfile(profile, desktop) }
     }
 }

@@ -38,7 +38,6 @@ import com.kododake.aabrowser.main.MainActivityCallbackFactory
 import com.kododake.aabrowser.main.MenuFabController
 import com.kododake.aabrowser.main.WebViewWarmupHelper
 import com.kododake.aabrowser.model.QuickActionButtonMode
-import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.tabs.BrowserTab
 import com.kododake.aabrowser.ui.MainActivitySetup
 import com.kododake.aabrowser.ui.controllers.NavigationButtonUpdater
@@ -88,7 +87,6 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
     override var currentPageTitle: String = ""
         private set
 
-    private var currentUserAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME
     private var shouldForceSessionRestore: Boolean = false
 
     var latestReleaseUrl: String = "https://github.com/kododake/AABrowser/releases"
@@ -183,7 +181,7 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
                 handleQuickActionButtonPressed = ::onQuickActionButtonPressed,
                 showStartPage = ::showStartPage,
                 onDesktopModeChanged = { isChecked ->
-                    managers.tabManager.updateDesktopMode(isChecked, currentUserAgentProfile)
+                    managers.tabManager.updateDesktopMode(isChecked, BrowserPreferences.getUserAgentProfile(this))
                 }
             )
         )
@@ -191,7 +189,6 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
             intentUrl = managers.navigationManager.extractBrowsableUrl(intent),
             shouldForceSessionRestore = shouldForceSessionRestore
         )
-        currentUserAgentProfile = BrowserPreferences.getUserAgentProfile(this)
 
         updateNavigationButtons()
         managers.tabManager.refreshTabs()
@@ -262,11 +259,10 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
     }
 
     private fun syncUserAgentProfile() {
-        val p = BrowserPreferences.getUserAgentProfile(this)
-        if (p != currentUserAgentProfile) {
-            currentUserAgentProfile = p
-            managers.tabManager.updateUserAgentProfile(p, BrowserPreferences.shouldUseDesktopMode(this))
-        }
+        managers.tabManager.updateUserAgentProfile(
+            BrowserPreferences.getUserAgentProfile(this),
+            BrowserPreferences.shouldUseDesktopMode(this)
+        )
     }
     override fun onUrlChanged(url: String) { currentUrl = url }
     override fun onTitleChanged(title: String) {

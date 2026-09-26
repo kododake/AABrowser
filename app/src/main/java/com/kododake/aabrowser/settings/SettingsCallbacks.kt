@@ -27,6 +27,7 @@ data class SettingsCallbacks(
     val onPickStartPageBackground: (() -> Unit)? = null,
     val onClearStartPageBackground: (() -> Unit)? = null,
     val onSponsorsVisibilityChanged: () -> Unit = {},
-    val onDrmL3EnforcerChanged: () -> Unit = {}
+    val onDrmL3EnforcerChanged: () -> Unit = {},
+    val onUserAgentChanged: () -> Unit = {}
 )
 

@@ -29,6 +29,7 @@ object UIPreferences {
     private const val KEY_QUICK_ACTION_BUTTON_POSITION = "quick_action_button_position"
     private const val KEY_HIDE_SPONSORS = "hide_sponsors"
     private const val KEY_USER_AGENT_PROFILE = "user_agent_profile"
+    private const val KEY_CUSTOM_USER_AGENT = "custom_user_agent"
     private const val KEY_DESKTOP_MODE = "desktop_mode"
     private const val KEY_FULLSCREEN_MODE = "fullscreen_mode"
 
@@ -92,6 +93,18 @@ object UIPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(KEY_USER_AGENT_PROFILE, profile.storageKey)
+            .apply()
+    }
+
+    fun getCustomUserAgent(context: Context): String {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_CUSTOM_USER_AGENT, "") ?: ""
+    }
+
+    fun setCustomUserAgent(context: Context, userAgent: String) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CUSTOM_USER_AGENT, userAgent.filterNot { it.isISOControl() }.trim())
             .apply()
     }
 

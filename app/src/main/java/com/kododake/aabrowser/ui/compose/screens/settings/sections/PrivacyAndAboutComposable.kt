@@ -32,6 +32,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Delete
@@ -39,7 +41,9 @@ import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LockReset
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.AppConstants
 import com.kododake.aabrowser.BuildConfig
@@ -67,9 +72,18 @@ import com.kododake.aabrowser.web.SslErrorHandlerHelper
 fun PrivacyAndAboutComposable(
     context: Context,
     onDrmL3EnforcerChanged: () -> Unit = {},
+    onUserAgentChanged: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var userAgent by remember { mutableStateOf(BrowserPreferences.getUserAgentProfile(context)) }
+    var savedCustomUserAgent by remember { mutableStateOf(BrowserPreferences.getCustomUserAgent(context)) }
+    var customUserAgent by remember { mutableStateOf(savedCustomUserAgent) }
+    val applyCustomUserAgent = {
+        BrowserPreferences.setCustomUserAgent(context, customUserAgent)
+        savedCustomUserAgent = BrowserPreferences.getCustomUserAgent(context)
+        customUserAgent = savedCustomUserAgent
+        onUserAgentChanged()
+    }
     var drmL3Enabled by remember { mutableStateOf(BrowserPreferences.isDrmL3EnforcerEnabled(context)) }
     var showUaDialog by remember { mutableStateOf(false) }
     var showClearCookiesDialog by remember { mutableStateOf(false) }
@@ -90,6 +104,34 @@ fun PrivacyAndAboutComposable(
             position = ListGroupPosition.Top,
             onClick = { showUaDialog = true }
         )
+
+        if (userAgent == UserAgentProfile.CUSTOM) {
+            Spacer(Modifier.height(3.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                OutlinedTextField(
+                    value = customUserAgent,
+                    onValueChange = { customUserAgent = it },
+                    label = { Text(stringResource(R.string.settings_user_agent_custom_hint)) },
+                    placeholder = { Text(stringResource(R.string.settings_user_agent_custom_empty_fallback)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { applyCustomUserAgent() }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = applyCustomUserAgent,
+                    enabled = customUserAgent.trim() != savedCustomUserAgent,
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(stringResource(R.string.settings_user_agent_custom_save))
+                }
+            }
+        }
 
         Spacer(Modifier.height(3.dp))
 
@@ -197,8 +239,11 @@ fun PrivacyAndAboutComposable(
             items = UserAgentProfile.entries,
             selectedItem = userAgent,
             onItemSelected = { profile ->
-                userAgent = profile
-                BrowserPreferences.setUserAgentProfile(context, profile)
+                if (profile != userAgent) {
+                    userAgent = profile
+                    BrowserPreferences.setUserAgentProfile(context, profile)
+                    onUserAgentChanged()
+                }
             },
             onDismiss = { showUaDialog = false },
             itemLabel = { profile ->

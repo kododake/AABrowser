@@ -116,6 +116,17 @@
     <string name="settings_user_agent_android_subtitle">Mobile: Android Chrome. Desktop mode uses Windows Chrome UA.</string>
     <string name="settings_user_agent_safari">Safari (iOS/macOS)</string>
     <string name="settings_user_agent_safari_subtitle">Use Safari-like identity for Apple-optimized pages.</string>
+    <string name="settings_user_agent_firefox">Firefox</string>
+    <string name="settings_user_agent_firefox_subtitle">Mobile: Firefox Android. Desktop: Firefox Windows.</string>
+    <string name="settings_user_agent_edge">Microsoft Edge</string>
+    <string name="settings_user_agent_edge_subtitle">Mobile/Desktop: Edge Chromium-based.</string>
+    <string name="settings_user_agent_samsung">Samsung Internet</string>
+    <string name="settings_user_agent_samsung_subtitle">Mobile: Samsung Internet. Desktop uses Windows Chrome UA.</string>
+    <string name="settings_user_agent_custom">Custom</string>
+    <string name="settings_user_agent_custom_subtitle">Enter your own user agent string. Desktop mode only changes the page layout.</string>
+    <string name="settings_user_agent_custom_hint">Custom User Agent</string>
+    <string name="settings_user_agent_custom_save">Apply</string>
+    <string name="settings_user_agent_custom_empty_fallback">Falls back to Android Chrome if blank.</string>
     <string name="settings_site_data_title">Privacy and site data</string>
     <string name="settings_site_data_description">Manage saved site permissions, cookies, and local site data stored by the browser.</string>
     <string name="settings_drm_l3_enforcer">DRM Widevine L3 enforcer</string>

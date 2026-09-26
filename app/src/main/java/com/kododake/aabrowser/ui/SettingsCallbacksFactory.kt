@@ -45,6 +45,11 @@ object SettingsCallbacksFactory {
                     tab.webView.updateDrmL3Enforcer(enabled)
                 }
             },
+            onUserAgentChanged = {
+                val profile = BrowserPreferences.getUserAgentProfile(activity)
+                val desktop = BrowserPreferences.shouldUseDesktopMode(activity)
+                tabManager.updateUserAgentProfile(profile, desktop)
+            },
             onScaleChanged = { callbacks.onRecreateRequested() },
             onHomePageChanged = { callbacks.onHomePageChanged() },
             onInAppControlsChanged = {
