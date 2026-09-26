@@ -4,6 +4,8 @@
 
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://www.android.com/)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
+[![Sponsor](https://img.shields.io/badge/Sponsor-Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/kododake)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub_Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/kododake)
 [<img src="https://img.shields.io/badge/Download_APK-GitHub_Releases-181717?style=for-the-badge&logo=github&logoColor=white" height="40" alt="Download APK on GitHub Releases">](https://github.com/kododake/AABrowser/releases/latest)
 [<img src="https://github.com/user-attachments/assets/1551eaef-432d-4634-875c-f085870d00a1" alt="Get it on Obtainium" height="40">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.kododake.aabrowser%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkododake%2FAABrowser%22%2C%22author%22%3A%22kododake%22%2C%22name%22%3A%22AABrowser%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D)
 
@@ -13,8 +15,6 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 > [!CAUTION]
 > **Beware of Fake Websites**
 > Fake websites impersonating AA Browser have appeared. **This GitHub repository (https://github.com/kododake/AABrowser) is the ONLY official source.** To prevent malware infections and financial damage, absolutely do not trust or download from any other websites.
-
-
 
 > [!NOTE]
 > **Requires Android 15 or later**
@@ -36,7 +36,6 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 - 🚀 **Dynamic Start Page:** Up to 6 quick-link tiles with smooth drag-and-drop reordering, cached site icons, and custom background image support.
 - 🗂️ **Desktop-Class Tab Management:** Easily open, switch, close, and restore multiple browser tabs directly from your dashboard.
 - 🚗 **Car-First Controls:** One-touch mobile/desktop mode switching, global UI scaling, and intuitive bookmark management designed for head units.
-
 
 ### 📸 Screenshots
 
@@ -144,15 +143,33 @@ I care about the app's growth, but I care about your privacy even more. This app
 
 ---
 
-## ☕ Support a Student Developer
+## ☕ Support a Student Developer & Project Sustainability
 
-If AA Browser makes your "car life" better, please consider sponsoring this project! As a student developer on a tight budget, your support covers daily expenses.
+> [!WARNING]
+> ### ⚠️ An Urgent Reality Check from the Developer
+> 
+> AA Browser now serves over **50,000 daily users** and **1.5 million monthly users**. However, despite this massive scale, **donations over the last 2+ months have been literally $0 (¥0)**.
+> 
+> As a solo student developer balancing studies while single-handedly managing infrastructure costs, device testing, and frequent Android Auto breakages, **this situation has become critically tough and unsustainable.**
+> 
+> Continuous active development, timely bug fixes, and critical security patches require real resources. **Even a single cup of coffee makes an immense difference** and directly keeps this project alive, safe, and evolving.
+> 
+> If AA Browser brings convenience or fun to your drives, please consider chipping in:
+> 
+> 👉 **[Support on Buy Me a Coffee](https://buymeacoffee.com/kododake)** ☕✨  
+> 👉 **[Sponsor on GitHub Sponsors](https://github.com/sponsors/kododake)** 💖
 
-[<img src="docs/img/bmc-white-button.png" alt="Buy Me A Coffee" height="48">](https://buymeacoffee.com/kododake)
-[<img src="https://img.shields.io/badge/Sponsor_on-GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" height="48" alt="Sponsor on GitHub">](https://github.com/sponsors/kododake)
+<div align="center">
+  <a href="https://buymeacoffee.com/kododake">
+    <img src="docs/img/bmc-white-button.png" alt="Buy Me A Coffee" height="48">
+  </a>
+  <a href="https://github.com/sponsors/kododake">
+    <img src="https://img.shields.io/badge/Sponsor_on-GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" height="48" alt="Sponsor on GitHub">
+  </a>
+</div>
+https://buymeacoffee.com/kododake
 
-*(Direct link: [Buy Me a Coffee](https://buymeacoffee.com/kododake) / [GitHub Sponsors](https://github.com/sponsors/kododake))*
-
+https://github.com/sponsors/kododake
 
 *If you sponsor the project, please let me know in the Discussions! I'd love to add you to our sponsors list as a token of my gratitude.*
 
