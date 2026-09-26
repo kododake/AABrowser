@@ -77,7 +77,7 @@ If the app fails to launch, try opening a non-Google Maps navigation app (such a
 
 ## ⚠️ Current Issues
 
-- 🚫 **No Ad Blocking:** Ad filtering is not currently implemented (contributions welcome!).
+- 🚫 **No Ad Blocking:** Ad filtering is not currently implemented.
 - 🚗 **Stationary Use Only**
 
 ---
