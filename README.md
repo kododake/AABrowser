@@ -26,7 +26,7 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 ---
 
 <div align="center">
-  <img width="80%" src="docs/img/aabrowser3-0.png" alt="AA Browser showcase screenshot" />
+  <img width="80%" src="docs/img/aabrowser3.gif" alt="AA Browser showcase screenshot" />
 </div>
 
 ## ✨ Key Features
