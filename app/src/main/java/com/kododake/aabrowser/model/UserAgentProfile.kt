@@ -33,6 +33,26 @@ enum class UserAgentProfile(
         storageKey = "safari",
         titleRes = R.string.settings_user_agent_safari,
         subtitleRes = R.string.settings_user_agent_safari_subtitle
+    ),
+    FIREFOX(
+        storageKey = "firefox",
+        titleRes = R.string.settings_user_agent_firefox,
+        subtitleRes = R.string.settings_user_agent_firefox_subtitle
+    ),
+    EDGE(
+        storageKey = "edge",
+        titleRes = R.string.settings_user_agent_edge,
+        subtitleRes = R.string.settings_user_agent_edge_subtitle
+    ),
+    SAMSUNG_INTERNET(
+        storageKey = "samsung_internet",
+        titleRes = R.string.settings_user_agent_samsung,
+        subtitleRes = R.string.settings_user_agent_samsung_subtitle
+    ),
+    CUSTOM(
+        storageKey = "custom",
+        titleRes = R.string.settings_user_agent_custom,
+        subtitleRes = R.string.settings_user_agent_custom_subtitle
     );
 
     companion object {

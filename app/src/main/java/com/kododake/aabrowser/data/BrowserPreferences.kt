@@ -49,6 +49,8 @@ object BrowserPreferences {
     // --- User Agent & Desktop Mode ---
     fun getUserAgentProfile(context: Context): UserAgentProfile = UIPreferences.getUserAgentProfile(context)
     fun setUserAgentProfile(context: Context, profile: UserAgentProfile) = UIPreferences.setUserAgentProfile(context, profile)
+    fun getCustomUserAgent(context: Context): String = UIPreferences.getCustomUserAgent(context)
+    fun setCustomUserAgent(context: Context, userAgent: String) = UIPreferences.setCustomUserAgent(context, userAgent)
     fun shouldUseDesktopMode(context: Context): Boolean = UIPreferences.shouldUseDesktopMode(context)
     fun toggleDesktopMode(context: Context): Boolean = UIPreferences.toggleDesktopMode(context)
     fun setDesktopMode(context: Context, enabled: Boolean) = UIPreferences.setDesktopMode(context, enabled)
