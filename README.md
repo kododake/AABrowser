@@ -4,6 +4,9 @@
 
 [![Android](https://img.shields.io/badge/Android-15%2B-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://www.android.com/)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0)
+[![Sponsor](https://img.shields.io/badge/Sponsor-Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/kododake)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub_Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/kododake)
+[<img src="https://img.shields.io/badge/Download_APK-GitHub_Releases-181717?style=for-the-badge&logo=github&logoColor=white" height="40" alt="Download APK on GitHub Releases">](https://github.com/kododake/AABrowser/releases/latest)
 [<img src="https://github.com/user-attachments/assets/1551eaef-432d-4634-875c-f085870d00a1" alt="Get it on Obtainium" height="40">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.kododake.aabrowser%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkododake%2FAABrowser%22%2C%22author%22%3A%22kododake%22%2C%22name%22%3A%22AABrowser%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%2C%5C%22includeZips%5C%22%3Afalse%2C%5C%22zippedApkFilterRegEx%5C%22%3A%5C%22%5C%22%7D%22%2C%22overrideSource%22%3Anull%7D)
 
 **The ultimate WebView browser experience for Android Auto head units.**
@@ -12,8 +15,6 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 > [!CAUTION]
 > **Beware of Fake Websites**
 > Fake websites impersonating AA Browser have appeared. **This GitHub repository (https://github.com/kododake/AABrowser) is the ONLY official source.** To prevent malware infections and financial damage, absolutely do not trust or download from any other websites.
-
-
 
 > [!NOTE]
 > **Requires Android 15 or later**
@@ -25,34 +26,24 @@ Transform your "parked time" with a sleek, modern browser designed specifically 
 ---
 
 <div align="center">
-  <img width="90%" src="docs/img/aabrowser1.png" alt="AA Browser showcase screenshot" />
+  <img width="80%" src="docs/img/aabrowser3.gif" alt="AA Browser showcase screenshot" />
 </div>
 
-## ✨ Features
 
-- 🎯 **Native Automotive UI:** Designed specifically for car displays, not just a stretched phone app.
-- 🎬 **Immersive Media:** Watch fullscreen DRM-protected video (supports Widevine L3 only due to technical limitations) — perfect for charging breaks or while parked in a "flat, boring desert world."
-- 🎨 **Light + AMOLED Themes:** Switch between a bright light theme and a true-black AMOLED dark mode built for car displays.
-- 🌓 **Beta Dark Pages:** Optionally ask WebView to darken supported pages while the dark theme is active.
-- 🏠 **Home Page Or Start Page:** Launch straight into a custom home page, or use the start page dashboard when no home page is set.
-- 🚀 **Six Quick Links:** The start page now supports up to six shortcut cards with default popular sites and a custom background image.
-- 🗂️ **Real Tabs + Tab Manager:** Open multiple browser tabs, switch between them from the in-app tab manager, and close tabs without losing your place.
-- ♻️ **Restore Last Tabs:** Optionally reopen the full tab session from your previous launch when no home page override is active.
-- 🔁 **Resume Last Page:** Optionally reopen the last visited page on launch when no home page is configured.
-- 🧭 **Persistent URL Bar:** Optionally keep a compact address bar visible above the page for faster browsing.
-- 🎛️ **Configurable Quick Action Button:** Choose whether the floating button opens the controls menu or jumps straight to the URL bar, keep it always visible, and move it to a corner that fits your screen.
-- 🖼️ **Cached Site Icons:** Quick-link cards cache first-party site icons locally so the start page stays branded without refetching on every launch.
-- 🔎 **Global Display Scale:** Adjust the full UI and page-content scale together with presets or a custom percentage.
-- 🔄 **Smart Desktop Mode:** Seamlessly toggle between mobile and desktop rendering.
-- 📚 **Dashboard Bookmarks:** Quick access to your favorite sites without touching your phone.
+## ✨ Key Features
+
+- 🎨 **Material 3 Expressive UI:** Built specifically for car screens with fluid expressive animations, modern bottom sheets, and true-black AMOLED theme.
+- 🎬 **Immersive Video & Fullscreen:** Stream DRM-protected video (Widevine L3) and toggle instant fullscreen with a single tap for parked entertainment.
+- 🚀 **Dynamic Start Page:** Up to 6 quick-link tiles with smooth drag-and-drop reordering, cached site icons, and custom background image support.
+- 🗂️ **Desktop-Class Tab Management:** Easily open, switch, close, and restore multiple browser tabs directly from your dashboard.
+- 🚗 **Car-First Controls:** One-touch mobile/desktop mode switching, global UI scaling, and intuitive bookmark management designed for head units.
 - 🛡️ **Shields (Ad & Tracker Blocking):** uBlock Origin compatible filtering with EasyList, EasyPrivacy and the uBO lists, cosmetic (element-hiding) filters and scriptlets, weekly background list updates, a per-site switch in the menu and custom list subscriptions. See [docs/ADBLOCK.md](docs/ADBLOCK.md).
-
 
 ### 📸 Screenshots
 
 <div align="center">
-  <img width="44%" src="docs/screenshots/litemode.gif" alt="AA Browser light mode live screenshot" />
-  <img width="44%" src="docs/screenshots/darkmode.gif" alt="AA Browser dark mode live screenshot" />
+  <img width="44%" src="docs/screenshots/litemode-v3_0.png" alt="AA Browser light mode live screenshot" />
+  <img width="44%" src="docs/screenshots/darkmode-v3_0.png" alt="AA Browser dark mode live screenshot" />
 </div>
 
 ---
@@ -107,14 +98,14 @@ Every contribution makes AA Browser better!
         <img src="https://github.com/kododake.png?s=100" width="60" alt="kododake"/><br />
         <sub><b>kododake</b></sub>
       </a><br />
-      <sub>Project Lead</sub>
+      <sub>Project Lead & Maintainer</sub>
     </td>
     <td align="center" valign="top" width="20%">
       <a href="https://github.com/cmacrowther">
         <img src="https://github.com/cmacrowther.png?s=100" width="60" alt="Colin Crowther"/><br />
         <sub><b>Colin Crowther</b></sub>
       </a><br />
-      <sub>Design Improvements</sub>
+      <sub>Original Design</sub>
     </td>
     <td align="center" valign="top" width="20%">
       <a href="https://github.com/jigneshbhavani">
@@ -128,14 +119,14 @@ Every contribution makes AA Browser better!
         <img src="https://github.com/SaveEditors.png?s=100" width="60" alt="SaveEditors"/><br />
         <sub><b>SaveEditors</b></sub>
       </a><br />
-      <sub>Multi-tab support, Home screen</sub>
+      <sub>Multi-tab support,Original Home screen</sub>
     </td>
     <td align="center" valign="top" width="20%">
       <a href="https://github.com/gregorixG">
         <img src="https://github.com/gregorixG.png?s=100" width="60" alt="gregorixG"/><br />
         <sub><b>gregorixG</b></sub>
       </a><br />
-      <sub>Improve desktop site user agent handling</sub>
+      <sub>Desktop site UA handling</sub>
     </td>
   </tr>
   <tr>
@@ -169,11 +160,32 @@ I care about the app's growth, but I care about your privacy even more. This app
 
 ---
 
-## ☕ Support a Student Developer
+## ☕ Support a Student Developer & Project Sustainability
 
-If AA Browser makes your "car life" better, please consider sponsoring this project! As a student developer on a tight budget, your support covers daily expenses.
+> [!WARNING]
+> ### ⚠️ An Urgent Reality Check from the Developer
+> 
+> AA Browser now serves over **50,000 daily users** and **1.5 million monthly users**. However, despite this massive scale, **donations over the last 2+ months have been literally $0 (¥0)**.
+> 
+> As a solo student developer balancing studies while single-handedly managing infrastructure costs, device testing, and frequent Android Auto breakages, **this situation has become critically tough and unsustainable.**
+> 
+> Continuous active development, timely bug fixes, and critical security patches require real resources. **Even a single cup of coffee makes an immense difference** and directly keeps this project alive, safe, and evolving.
+> 
+> If AA Browser brings convenience or fun to your drives, please consider chipping in:
+> 
+> 👉 **[Support on Buy Me a Coffee](https://buymeacoffee.com/kododake)** ☕✨  
+> 👉 **[Sponsor on GitHub Sponsors](https://github.com/sponsors/kododake)** 💖
 
-**GitHub Sponsor:**
+<div align="center">
+  <a href="https://buymeacoffee.com/kododake">
+    <img src="docs/img/bmc-white-button.png" alt="Buy Me A Coffee" height="48">
+  </a>
+  <a href="https://github.com/sponsors/kododake">
+    <img src="https://img.shields.io/badge/Sponsor_on-GitHub-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white" height="48" alt="Sponsor on GitHub">
+  </a>
+</div>
+https://buymeacoffee.com/kododake
+
 https://github.com/sponsors/kododake
 
 *If you sponsor the project, please let me know in the Discussions! I'd love to add you to our sponsors list as a token of my gratitude.*

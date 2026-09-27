@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.navigation
 
 import android.content.Context
@@ -13,6 +30,7 @@ import com.kododake.aabrowser.permissions.PermissionManager
 import com.kododake.aabrowser.startpage.StartPageManager
 import com.kododake.aabrowser.tabs.TabManager
 import com.kododake.aabrowser.ui.BrowserUIManager
+import com.kododake.aabrowser.ui.controllers.ShieldsLoadingIndicator
 import com.kododake.aabrowser.web.loadUrlWhenShieldsReady
 
 class NavigationManager(
@@ -53,6 +71,13 @@ class NavigationManager(
         }
     }
 
+    fun navigateFromBookmark(rawUrl: String) {
+        val navigable = BrowserPreferences.formatNavigableUrl(rawUrl.trim())
+        if (navigable.isNotEmpty()) {
+            navigateActiveTabTo(navigable, closeMenuAfterNavigate = true, resetSessionIfPageOpen = true)
+        }
+    }
+
     fun navigateToAddress(raw: String, closeMenuAfterNavigate: Boolean) {
         val navigable = BrowserPreferences.formatNavigableUrl(raw)
         if (navigable.isNotEmpty()) {
@@ -60,13 +85,24 @@ class NavigationManager(
         }
     }
 
-    private fun navigateActiveTabTo(navigable: String, closeMenuAfterNavigate: Boolean) {
+    private fun navigateActiveTabTo(
+        navigable: String,
+        closeMenuAfterNavigate: Boolean,
+        resetSessionIfPageOpen: Boolean = false
+    ) {
         var targetTab = tabManager.activeTab
         if (targetTab == null) {
             targetTab = tabManager.createNewTab(activate = true)
         }
         if (targetTab == null) {
             return
+        }
+
+        if (resetSessionIfPageOpen && !startPageManager.isShowingStartPage) {
+            val freshTab = tabManager.resetActiveTabSession(navigable)
+            if (freshTab != null) {
+                targetTab = freshTab
+            }
         }
         
         val targetWebView = targetTab.webView
@@ -76,28 +112,24 @@ class NavigationManager(
         }
 
         val finishNavigation: (() -> Unit) -> Unit = { loadAction ->
-            targetTab.currentUrl = navigable
-            targetTab.currentTitle = ""
+            tabManager.updateTabUrlAndTitle(targetTab.id, navigable, "")
             
             if (targetTab.id == tabManager.activeTabId) {
                 callbacks.setCurrentUrl(navigable)
                 callbacks.setCurrentPageTitle("")
-                if (binding.addressEdit.text?.toString() != navigable) {
-                    binding.addressEdit.setText(navigable)
-                    binding.addressEdit.setSelection(navigable.length)
-                }
             }
             
             BrowserPreferences.persistUrl(activity, navigable)
-            tabManager.persistTabSession()
-            callbacks.onHideStartPage()
+            val isFromStartPage = startPageManager.isShowingStartPage
+            if (isFromStartPage) {
+                targetWebView.visibility = View.VISIBLE
+                callbacks.onHideStartPage()
+            }
+            startPageManager.beginNavigationLoading(fromStartPage = isFromStartPage)
             loadAction()
             
             if (closeMenuAfterNavigate && binding.menuOverlay.isVisible) {
                 uiManager.hideMenuOverlay()
-            } else {
-                uiManager.hideKeyboard(binding.persistentAddressEdit)
-                binding.persistentAddressEdit.clearFocus()
             }
         }
 
@@ -141,8 +173,6 @@ class NavigationManager(
     }
 
     private fun showShieldsLoading(waiting: Boolean) {
-        binding.progressIndicator.isIndeterminate = waiting
-        binding.progressIndicator.isVisible = waiting
-        binding.loadingRulesLabel.isVisible = waiting
+        ShieldsLoadingIndicator.show(binding, waiting)
     }
 }

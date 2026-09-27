@@ -1,11 +1,31 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.web
 
 import android.app.Activity
 import android.net.Uri
 import android.net.http.SslError
+import android.view.WindowManager
 import android.webkit.SslErrorHandler
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.kododake.aabrowser.R
+import com.kododake.aabrowser.ui.compose.screens.dialogs.DialogViews
 
 object SslErrorHandlerHelper {
 
@@ -29,52 +49,39 @@ object SslErrorHandlerHelper {
         val errorDescription = getSslErrorDescription(activity, primaryError)
         val hostLabel = host ?: url
 
-        val view = activity.layoutInflater.inflate(R.layout.dialog_cleartext_confirmation, null)
-        val titleView = view.findViewById<android.widget.TextView>(R.id.cleartext_title)
-        val messageView = view.findViewById<android.widget.TextView>(R.id.cleartext_message)
-        val hostContainer = view.findViewById<android.view.View>(R.id.cleartext_host_container)
-        val hostLabelView = view.findViewById<android.widget.TextView>(R.id.cleartext_host_label)
-        val hostValueView = view.findViewById<android.widget.TextView>(R.id.cleartext_host_value)
-        val detailView = view.findViewById<android.widget.TextView>(R.id.cleartext_detail)
-        val cancelButton = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_cancel_dialog)
-        val allowOnceButton = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_allow_once)
-        val allowHostButton = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn_allow_host)
-
-        val dialog = MaterialAlertDialogBuilder(activity, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
-            .setView(view)
-            .setCancelable(false)
-            .create()
-
-        titleView.text = activity.getString(R.string.ssl_error_title)
-        messageView.text = activity.getString(R.string.ssl_error_message, hostLabel)
-
-        hostContainer.visibility = android.view.View.VISIBLE
-        hostLabelView.text = activity.getString(R.string.location_access_host_label)
-        hostValueView.text = hostLabel
-
-        detailView.visibility = android.view.View.VISIBLE
-        detailView.text = activity.getString(R.string.ssl_error_reason_prefix) + " " + errorDescription
-
-        cancelButton.text = activity.getString(R.string.ssl_error_cancel)
-        allowOnceButton.text = activity.getString(R.string.ssl_error_proceed)
-        allowHostButton.visibility = android.view.View.GONE
-        cancelButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            handler.cancel()
-        }
-
-        allowOnceButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            if (host != null) {
-                allowedSslHosts.add(host)
+        var dialog: AlertDialog? = null
+        val view = DialogViews.createConfirmationDialogView(
+            context = activity,
+            title = activity.getString(R.string.ssl_error_title),
+            message = activity.getString(R.string.ssl_error_message, hostLabel),
+            hostLabel = activity.getString(R.string.location_access_host_label),
+            hostValue = hostLabel,
+            detailMessage = activity.getString(R.string.ssl_error_reason_prefix) + " " + errorDescription,
+            isDestructive = true,
+            confirmButtonText = activity.getString(R.string.ssl_error_proceed),
+            onConfirm = {
+                try { dialog?.dismiss() } catch (_: Exception) {}
+                if (host != null) {
+                    allowedSslHosts.add(host)
+                }
+                handler.proceed()
+            },
+            dismissButtonText = activity.getString(R.string.ssl_error_cancel),
+            onDismiss = {
+                try { dialog?.dismiss() } catch (_: Exception) {}
+                handler.cancel()
             }
-            handler.proceed()
-        }
+        )
 
         try {
+            dialog = MaterialAlertDialogBuilder(activity, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
+                .setView(view)
+                .setCancelable(false)
+                .create()
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
             dialog.show()
             val width = (activity.resources.displayMetrics.widthPixels * 0.9).toInt()
-            dialog.window?.setLayout(width, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
+            dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
         } catch (_: Exception) {
             handler.cancel()
         }

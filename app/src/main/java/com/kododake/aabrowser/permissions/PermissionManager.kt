@@ -1,38 +1,49 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.permissions
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.view.View
-import android.view.WindowManager
 import android.webkit.PermissionRequest
-import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.kododake.aabrowser.AppConstants
-import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 
 class PermissionManager(private val activity: AppCompatActivity) {
 
-    companion object {
-        private const val DIALOG_TYPE_CLEARTEXT = 0
-        private const val DIALOG_TYPE_MICROPHONE = 1
-        private const val DIALOG_TYPE_LOCATION = 2
-    }
+    private val dialogs = PermissionDialogs(activity)
+    private val geolocationHandler = GeolocationPermissionHandler(activity, dialogs)
 
     var pendingPermissionRequest: PermissionRequest? = null
     var pendingSpeechBridgeTabId: Long? = null
-    var pendingGeolocationOrigin: String? = null
-    var pendingGeolocationCallback: android.webkit.GeolocationPermissions.Callback? = null
-    var isShowingCleartextDialog: Boolean = false
-    var isShowingMicrophoneDialog: Boolean = false
-    var isShowingLocationDialog: Boolean = false
+    var pendingGeolocationOrigin: String?
+        get() = geolocationHandler.pendingGeolocationOrigin
+        set(value) { geolocationHandler.pendingGeolocationOrigin = value }
+    var pendingGeolocationCallback: android.webkit.GeolocationPermissions.Callback?
+        get() = geolocationHandler.pendingGeolocationCallback
+        set(value) { geolocationHandler.pendingGeolocationCallback = value }
+
+    val isShowingCleartextDialog: Boolean get() = dialogs.isShowingCleartextDialog
+    val isShowingMicrophoneDialog: Boolean get() = dialogs.isShowingMicrophoneDialog
+    val isShowingLocationDialog: Boolean get() = dialogs.isShowingLocationDialog
 
     fun ensureNotificationPermissionIfNeeded(requestCode: Int) {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
@@ -93,12 +104,12 @@ class PermissionManager(private val activity: AppCompatActivity) {
             return
         }
 
-        if (activity.isFinishing || activity.isDestroyed || isShowingMicrophoneDialog) {
+        if (activity.isFinishing || activity.isDestroyed || dialogs.isShowingMicrophoneDialog) {
             denyAudioButAllowProtectedMediaIfPresent(request)
             return
         }
 
-        showMicrophoneAccessDialog(
+        dialogs.showMicrophoneAccessDialog(
             origin = origin,
             isSecure = isSecure,
             onAllowOnce = { continueWebPermissionRequest(request, requestCode) },
@@ -122,12 +133,12 @@ class PermissionManager(private val activity: AppCompatActivity) {
             return
         }
 
-        if (activity.isFinishing || activity.isDestroyed || isShowingMicrophoneDialog) {
+        if (activity.isFinishing || activity.isDestroyed || dialogs.isShowingMicrophoneDialog) {
             onPermissionResult(false)
             return
         }
 
-        showMicrophoneAccessDialog(
+        dialogs.showMicrophoneAccessDialog(
             origin = pageUri,
             isSecure = isSecure,
             onAllowOnce = { continueSpeechRecognitionMicrophoneAccess(onPermissionResult) },
@@ -152,82 +163,7 @@ class PermissionManager(private val activity: AppCompatActivity) {
     }
 
     fun handleGeolocationPermissionRequest(origin: String?, callback: android.webkit.GeolocationPermissions.Callback?) {
-        if (callback == null) return
-        val uri = runCatching { origin?.let(Uri::parse) }.getOrNull()
-        val host = uri?.host?.lowercase()
-        val scheme = uri?.scheme?.lowercase()
-        val isSecure = scheme == "https" || host == "localhost" || host == "127.0.0.1" || scheme == "file"
-
-        if (!isSecure) {
-            callback.invoke(origin, false, false)
-            return
-        }
-
-        val hasFine = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val hasCoarse = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-        if (BrowserPreferences.isHostAllowedLocation(activity, host) && hasFine) {
-            callback.invoke(origin, true, true)
-            return
-        }
-
-        if (activity.isFinishing || activity.isDestroyed || isShowingLocationDialog) {
-            callback.invoke(origin, false, false)
-            return
-        }
-
-        if (hasCoarse && !hasFine) {
-            showLocationUpgradeDialog(
-                origin = uri,
-                onUpgrade = {
-                    pendingGeolocationCallback?.invoke(pendingGeolocationOrigin, false, false)
-                    pendingGeolocationOrigin = origin
-                    pendingGeolocationCallback = callback
-                    ActivityCompat.requestPermissions(
-                        activity,
-                        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                        AppConstants.REQUEST_CODE_ACCESS_LOCATION
-                    )
-                },
-                onKeepApproximate = {
-                    callback.invoke(origin, true, true)
-                },
-                onCancel = {
-                    callback.invoke(origin, false, false)
-                }
-            )
-            return
-        }
-
-        showLocationAccessDialog(
-            origin = uri,
-            isSecure = isSecure,
-            onAllowOnce = { continueGeolocationPermissionRequest(origin, callback) },
-            onAllowHost = {
-                host?.let { BrowserPreferences.addAllowedLocationHost(activity, it) }
-                continueGeolocationPermissionRequest(origin, callback)
-            },
-            onCancel = { callback.invoke(origin, false, false) }
-        )
-    }
-
-    private fun continueGeolocationPermissionRequest(origin: String?, callback: android.webkit.GeolocationPermissions.Callback) {
-        val hasFine = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val hasCoarse = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-        if (hasFine || hasCoarse) {
-            callback.invoke(origin, true, true)
-        } else {
-            pendingGeolocationCallback?.invoke(pendingGeolocationOrigin, false, false)
-
-            pendingGeolocationOrigin = origin
-            pendingGeolocationCallback = callback
-            ActivityCompat.requestPermissions(
-                activity,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                AppConstants.REQUEST_CODE_ACCESS_LOCATION
-            )
-        }
+        geolocationHandler.handleGeolocationPermissionRequest(origin, callback)
     }
 
     fun showLocationUpgradeDialog(
@@ -236,66 +172,7 @@ class PermissionManager(private val activity: AppCompatActivity) {
         onKeepApproximate: () -> Unit,
         onCancel: () -> Unit
     ) {
-        if (activity.isFinishing || activity.isDestroyed) {
-            onCancel()
-            return
-        }
-        if (isShowingLocationDialog) return
-        isShowingLocationDialog = true
-
-        val view = activity.layoutInflater.inflate(R.layout.dialog_cleartext_confirmation, null)
-        val titleView = view.findViewById<TextView>(R.id.cleartext_title)
-        val messageView = view.findViewById<TextView>(R.id.cleartext_message)
-        val hostContainer = view.findViewById<View>(R.id.cleartext_host_container)
-        val hostLabelView = view.findViewById<TextView>(R.id.cleartext_host_label)
-        val hostValueView = view.findViewById<TextView>(R.id.cleartext_host_value)
-        val detailView = view.findViewById<TextView>(R.id.cleartext_detail)
-        val cancelButton = view.findViewById<MaterialButton>(R.id.btn_cancel_dialog)
-        val allowOnceButton = view.findViewById<MaterialButton>(R.id.btn_allow_once)
-        val allowHostButton = view.findViewById<MaterialButton>(R.id.btn_allow_host)
-        val dialog = MaterialAlertDialogBuilder(
-            activity,
-            com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog
-        ).setView(view).create()
-
-        titleView.text = activity.getString(R.string.location_upgrade_title)
-        messageView.text = activity.getString(R.string.location_upgrade_message)
-
-        val originLabel = origin?.host ?: origin?.toString() ?: activity.getString(R.string.location_access_unknown_origin)
-        hostContainer.visibility = View.VISIBLE
-        hostLabelView.text = activity.getString(R.string.location_access_host_label)
-        hostValueView.text = originLabel
-
-        detailView.visibility = View.GONE
-
-        allowHostButton.visibility = View.VISIBLE
-        allowHostButton.text = activity.getString(R.string.location_upgrade_btn_precise)
-        allowOnceButton.text = activity.getString(R.string.location_upgrade_btn_approximate)
-        cancelButton.text = activity.getString(android.R.string.cancel)
-
-        cancelButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            onCancel()
-        }
-        allowOnceButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            onKeepApproximate()
-        }
-        allowHostButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            onUpgrade()
-        }
-
-        dialog.setOnDismissListener { isShowingLocationDialog = false }
-
-        try {
-            dialog.show()
-            val width = (activity.resources.displayMetrics.widthPixels * 0.9).toInt()
-            dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
-        } catch (_: Exception) {
-            isShowingLocationDialog = false
-            onCancel()
-        }
+        dialogs.showLocationUpgradeDialog(origin, onUpgrade, onKeepApproximate, onCancel)
     }
 
     fun showLocationAccessDialog(
@@ -305,18 +182,7 @@ class PermissionManager(private val activity: AppCompatActivity) {
         onAllowHost: () -> Unit,
         onCancel: () -> Unit
     ) {
-        val originLabel = origin?.host ?: origin?.toString() ?: activity.getString(R.string.location_access_unknown_origin)
-        showSitePermissionDialog(
-            title = activity.getString(R.string.location_access_title),
-            message = activity.getString(R.string.location_access_message),
-            dialogType = DIALOG_TYPE_LOCATION,
-            hostLabel = activity.getString(R.string.location_access_host_label),
-            hostValue = originLabel,
-            detailMessage = activity.getString(R.string.location_access_detail),
-            onAllowOnce = onAllowOnce,
-            onAllowHost = if (origin?.host.isNullOrBlank() || !isSecure) null else onAllowHost,
-            onCancel = onCancel
-        )
+        dialogs.showLocationAccessDialog(origin, isSecure, onAllowOnce, onAllowHost, onCancel)
     }
 
     fun showMicrophoneAccessDialog(
@@ -326,18 +192,7 @@ class PermissionManager(private val activity: AppCompatActivity) {
         onAllowHost: () -> Unit,
         onCancel: () -> Unit
     ) {
-        val originLabel = origin?.host ?: origin?.toString() ?: activity.getString(R.string.microphone_access_unknown_origin)
-        showSitePermissionDialog(
-            title = activity.getString(R.string.microphone_access_title),
-            message = activity.getString(R.string.microphone_access_message),
-            dialogType = DIALOG_TYPE_MICROPHONE,
-            hostLabel = activity.getString(R.string.microphone_access_host_label),
-            hostValue = originLabel,
-            detailMessage = activity.getString(R.string.microphone_access_detail),
-            onAllowOnce = onAllowOnce,
-            onAllowHost = if (origin?.host.isNullOrBlank() || !isSecure) null else onAllowHost,
-            onCancel = onCancel
-        )
+        dialogs.showMicrophoneAccessDialog(origin, isSecure, onAllowOnce, onAllowHost, onCancel)
     }
 
     fun showCleartextNavigationDialog(
@@ -346,109 +201,7 @@ class PermissionManager(private val activity: AppCompatActivity) {
         onAllowHost: () -> Unit,
         onCancel: () -> Unit
     ) {
-        val host = uri.host ?: uri.toString()
-        showSitePermissionDialog(
-            title = activity.getString(R.string.cleartext_connection_title),
-            message = activity.getString(R.string.cleartext_connection_message, host),
-            dialogType = DIALOG_TYPE_CLEARTEXT,
-            onAllowOnce = onAllowOnce,
-            onAllowHost = onAllowHost,
-            onCancel = onCancel
-        )
-    }
-
-    private fun showSitePermissionDialog(
-        title: String,
-        message: String,
-        dialogType: Int,
-        hostLabel: String? = null,
-        hostValue: String? = null,
-        detailMessage: String? = null,
-        onAllowOnce: () -> Unit,
-        onAllowHost: (() -> Unit)?,
-        onCancel: () -> Unit
-    ) {
-        val flagAccessor: () -> Boolean = {
-            when (dialogType) {
-                DIALOG_TYPE_MICROPHONE -> isShowingMicrophoneDialog
-                DIALOG_TYPE_LOCATION -> isShowingLocationDialog
-                else -> isShowingCleartextDialog
-            }
-        }
-        val flagSetter: (Boolean) -> Unit = { showing ->
-            when (dialogType) {
-                DIALOG_TYPE_MICROPHONE -> isShowingMicrophoneDialog = showing
-                DIALOG_TYPE_LOCATION -> isShowingLocationDialog = showing
-                else -> isShowingCleartextDialog = showing
-            }
-        }
-
-        if (activity.isFinishing || activity.isDestroyed) {
-            onCancel()
-            return
-        }
-        if (flagAccessor()) return
-        flagSetter(true)
-
-        val view = activity.layoutInflater.inflate(R.layout.dialog_cleartext_confirmation, null)
-        val titleView = view.findViewById<TextView>(R.id.cleartext_title)
-        val messageView = view.findViewById<TextView>(R.id.cleartext_message)
-        val hostContainer = view.findViewById<View>(R.id.cleartext_host_container)
-        val hostLabelView = view.findViewById<TextView>(R.id.cleartext_host_label)
-        val hostValueView = view.findViewById<TextView>(R.id.cleartext_host_value)
-        val detailView = view.findViewById<TextView>(R.id.cleartext_detail)
-        val cancelButton = view.findViewById<MaterialButton>(R.id.btn_cancel_dialog)
-        val allowOnceButton = view.findViewById<MaterialButton>(R.id.btn_allow_once)
-        val allowHostButton = view.findViewById<MaterialButton>(R.id.btn_allow_host)
-        val dialog = MaterialAlertDialogBuilder(
-            activity,
-            com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog
-        ).setView(view).create()
-
-        titleView.text = title
-        messageView.text = message
-        if (!hostLabel.isNullOrBlank() && !hostValue.isNullOrBlank()) {
-            hostContainer.visibility = View.VISIBLE
-            hostLabelView.text = hostLabel
-            hostValueView.text = hostValue
-        } else {
-            hostContainer.visibility = View.GONE
-        }
-        if (!detailMessage.isNullOrBlank()) {
-            detailView.visibility = View.VISIBLE
-            detailView.text = detailMessage
-        } else {
-            detailView.visibility = View.GONE
-        }
-
-        cancelButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            onCancel()
-        }
-        allowOnceButton.setOnClickListener {
-            try { dialog.dismiss() } catch (_: Exception) {}
-            onAllowOnce()
-        }
-        if (onAllowHost != null) {
-            allowHostButton.visibility = View.VISIBLE
-            allowHostButton.setOnClickListener {
-                try { dialog.dismiss() } catch (_: Exception) {}
-                onAllowHost()
-            }
-        } else {
-            allowHostButton.visibility = View.GONE
-        }
-
-        dialog.setOnDismissListener { flagSetter(false) }
-
-        try {
-            dialog.show()
-            val width = (activity.resources.displayMetrics.widthPixels * 0.9).toInt()
-            dialog.window?.setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
-        } catch (_: Exception) {
-            flagSetter(false)
-            onCancel()
-        }
+        dialogs.showCleartextNavigationDialog(uri, onAllowOnce, onAllowHost, onCancel)
     }
 
     fun handleRequestPermissionsResult(
@@ -472,16 +225,7 @@ class PermissionManager(private val activity: AppCompatActivity) {
             onRecordAudioGranted(granted)
             pendingSpeechBridgeTabId = null
         } else if (requestCode == AppConstants.REQUEST_CODE_ACCESS_LOCATION) {
-            val hasFine = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            val hasCoarse = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-            val granted = hasFine || hasCoarse
-            val callback = pendingGeolocationCallback
-            val origin = pendingGeolocationOrigin
-            pendingGeolocationCallback = null
-            pendingGeolocationOrigin = null
-            if (callback != null) {
-                callback.invoke(origin, granted, true)
-            }
+            geolocationHandler.handlePermissionResult()
         }
     }
 }

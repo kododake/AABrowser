@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
     id("com.google.android.gms.oss-licenses-plugin")
 }
 
@@ -17,8 +18,8 @@ android {
         applicationId = "com.kododake.aabrowser"
         minSdk = 35
         targetSdk = 37
-        versionCode = 8
-        versionName = "2.2"
+        versionCode = 9
+        versionName = "3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -64,6 +65,11 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+        compose = true
+    }
+
+    androidResources {
+        generateLocaleConfig = true
     }
 
     androidComponents {
@@ -140,6 +146,16 @@ dependencies {
     implementation(libs.androidx.car.app)
     implementation(libs.zxing.core)
 
+    val composeBom = platform(libs.androidx.compose.bom)
+    implementation(composeBom)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.androidx.activity.compose)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.google.oss.licenses)
@@ -171,8 +187,11 @@ abstract class RenameApkTask : DefaultTask() {
     fun run() {
         val inDir = inputDir.get().asFile
         val outDir = outputDir.get().asFile
-        outDir.deleteRecursively()
-        outDir.mkdirs()
+        if (outDir.exists()) {
+            outDir.listFiles()?.forEach { it.deleteRecursively() }
+        } else {
+            outDir.mkdirs()
+        }
 
         val app = appName.get()
         val vName = versionNameProp.get()

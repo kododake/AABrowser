@@ -1,25 +1,45 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
+import android.net.Uri
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
+import com.kododake.aabrowser.BuildConfig
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.bookmarks.BookmarkManager
-import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.databinding.ActivityMainBinding
 import com.kododake.aabrowser.settings.SettingsCallbacks
 import com.kododake.aabrowser.settings.SettingsViews
 import com.kododake.aabrowser.startpage.StartPageManager
 import com.kododake.aabrowser.tabs.TabManager
-import com.kododake.aabrowser.web.updatePageDarkening
-import com.kododake.aabrowser.web.updateShieldsEnabled
+import com.kododake.aabrowser.ui.compose.screens.share.QrViews
+import com.kododake.aabrowser.ui.compose.screens.version.VersionFetcher
+import com.kododake.aabrowser.ui.compose.screens.version.VersionViews
+import kotlinx.coroutines.launch
 
 class OverlayManager(
     private val activity: AppCompatActivity,
@@ -36,177 +56,235 @@ class OverlayManager(
         fun onHomePageChanged()
         fun onPickBackgroundRequested()
         fun onVersionInfoReceived(latestUrl: String, tagName: String)
+        fun onReturnToMenuRequested() {}
+        fun onDismissOverlaysRequested() {}
+        fun onScreenProgress(screen: OverlayNavigationCoordinator.OverlayScreen, progress: Float) {}
     }
 
-    fun showQrCodeView(url: String) {
-        if (url.isBlank()) {
-            return
-        }
-        
-        hideAllOverlays()
-        binding.qrCodeViewRoot.visibility = View.VISIBLE
-        binding.qrCodeImage.setImageBitmap(null)
-        binding.qrCodeUrl.text = url
-        
+    private val qrIsVisibleState = mutableStateOf(false)
+    private val qrUrlState = mutableStateOf("")
+    private val qrBitmapState = mutableStateOf<Bitmap?>(null)
+
+    private val versionIsVisibleState = mutableStateOf(false)
+    private val isCheckingState = mutableStateOf(true)
+    private val latestVersionState = mutableStateOf<String?>(null)
+    private val releaseUrlState = mutableStateOf<String?>(null)
+
+    private val settingsIsVisibleState = mutableStateOf(false)
+
+    var isQrOpenedFromMenu = false
+        private set
+    var isVersionOpenedFromMenu = false
+        private set
+    var isSettingsOpenedFromMenu = false
+        private set
+
+    init {
+        setupComposeViews()
+    }
+
+    private fun setupComposeViews() {
+        QrViews.setup(
+            composeView = binding.qrCodeComposeView,
+            isVisibleState = qrIsVisibleState,
+            urlState = qrUrlState,
+            qrBitmapState = qrBitmapState,
+            animateEnterProvider = { true },
+            onCopyUrl = {
+                val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("URL", qrUrlState.value))
+                Toast.makeText(activity, "URL copied", Toast.LENGTH_SHORT).show()
+            },
+            onShareExternal = {
+                val url = qrUrlState.value
+                if (url.isNotBlank()) {
+                    uiManager.openUriExternally(Uri.parse(url))
+                }
+            },
+            onClose = {
+                if (isQrOpenedFromMenu) returnQrToMenu() else hideQrCodeView()
+            },
+            onDismiss = { hideQrCodeView() },
+            onDismissFinished = { onQrDismissFinished() },
+            onProgress = { callbacks.onScreenProgress(OverlayNavigationCoordinator.OverlayScreen.QR_CODE, it) }
+        )
+
+        VersionViews.setup(
+            composeView = binding.versionComposeView,
+            isVisibleState = versionIsVisibleState,
+            isCheckingState = isCheckingState,
+            latestVersionState = latestVersionState,
+            installedVersion = "v${BuildConfig.VERSION_NAME}",
+            releaseUrlState = releaseUrlState,
+            animateEnterProvider = { true },
+            onOpenRelease = { url ->
+                uiManager.openUriExternally(Uri.parse(url))
+            },
+            onClose = {
+                if (isVersionOpenedFromMenu) returnVersionToMenu() else hideCheckLatestView()
+            },
+            onDismiss = { hideCheckLatestView() },
+            onDismissFinished = { onVersionDismissFinished() },
+            onProgress = { callbacks.onScreenProgress(OverlayNavigationCoordinator.OverlayScreen.VERSION, it) }
+        )
+
+        val settingsCallbacks = SettingsCallbacksFactory.create(
+            activity = activity,
+            tabManager = tabManager,
+            startPageManager = startPageManager,
+            uiManager = uiManager,
+            callbacks = callbacks,
+            onClose = {
+                if (isSettingsOpenedFromMenu) returnSettingsToMenu() else hideSettingsView()
+            },
+            onDismiss = { hideSettingsView() }
+        )
+
+        SettingsViews.setup(
+            composeView = binding.settingsComposeView,
+            isVisibleState = settingsIsVisibleState,
+            animateEnterProvider = { true },
+            callbacks = settingsCallbacks,
+            onDismissFinished = { onSettingsDismissFinished() },
+            onProgress = { callbacks.onScreenProgress(OverlayNavigationCoordinator.OverlayScreen.SETTINGS, it) }
+        )
+    }
+
+    fun returnQrToMenu() {
+        qrIsVisibleState.value = false
+        binding.qrCodeComposeView.visibility = View.GONE
+        callbacks.onReturnToMenuRequested()
+    }
+
+    fun returnVersionToMenu() {
+        versionIsVisibleState.value = false
+        binding.versionComposeView.visibility = View.GONE
+        callbacks.onReturnToMenuRequested()
+    }
+
+    fun returnSettingsToMenu() {
+        settingsIsVisibleState.value = false
+        binding.settingsComposeView.visibility = View.GONE
+        callbacks.onReturnToMenuRequested()
+    }
+
+    fun showQrCodeView(url: String, fromMenu: Boolean = false) {
+        if (url.isBlank()) return
+        isQrOpenedFromMenu = fromMenu
+        hideOtherSubScreens()
+        binding.menuOverlay.visibility = View.VISIBLE
+        binding.qrCodeComposeView.visibility = View.VISIBLE
+        qrUrlState.value = url
+        qrBitmapState.value = null
+        qrIsVisibleState.value = true
+
         activity.lifecycleScope.launch {
             val bitmap = QRUtils.generateQrCodeAsync(url)
             if (bitmap != null) {
-                binding.qrCodeImage.setImageBitmap(bitmap)
+                qrBitmapState.value = bitmap
             }
         }
     }
 
     fun hideQrCodeView() {
-        binding.qrCodeViewRoot.visibility = View.GONE
-        binding.menuScroll.visibility = View.VISIBLE
+        qrIsVisibleState.value = false
     }
 
-    fun showSettingsView() {
-        hideAllOverlays()
-        binding.settingsViewRoot.visibility = View.VISIBLE
-        ensureSettingsContentPopulated()
+    private fun onQrDismissFinished() {
+        if (!qrIsVisibleState.value) {
+            binding.qrCodeComposeView.visibility = View.GONE
+            checkHideMenuOverlay()
+        }
+    }
+
+    fun showSettingsView(fromMenu: Boolean = false) {
+        isSettingsOpenedFromMenu = fromMenu
+        hideOtherSubScreens()
+        binding.menuOverlay.visibility = View.VISIBLE
+        binding.settingsComposeView.visibility = View.VISIBLE
+        settingsIsVisibleState.value = true
     }
 
     fun hideSettingsView() {
-        binding.settingsViewRoot.visibility = View.GONE
-        binding.menuScroll.visibility = View.VISIBLE
+        settingsIsVisibleState.value = false
     }
 
-    fun showCheckLatestView() {
-        hideAllOverlays()
-        binding.checkLatestViewRoot.visibility = View.VISIBLE
-        binding.checkLatestProgressIndicator.visibility = View.VISIBLE
-        
-        binding.checkLatestLatestVersion.text = activity.getString(R.string.menu_checking_latest)
-        binding.checkLatestLatestVersion.setTextColor(getColorFromAttr(android.R.attr.textColorPrimary))
+    private fun onSettingsDismissFinished() {
+        if (!settingsIsVisibleState.value) {
+            binding.settingsComposeView.visibility = View.GONE
+            checkHideMenuOverlay()
+        }
+    }
 
-        val packageName = activity.packageName
-        binding.checkLatestInstalledVersion.text = activity.getString(
-            R.string.installed_version_label, 
-            "v${com.kododake.aabrowser.BuildConfig.VERSION_NAME}"
-        )
-        
+    fun showCheckLatestView(fromMenu: Boolean = false) {
+        isVersionOpenedFromMenu = fromMenu
+        hideOtherSubScreens()
+        binding.menuOverlay.visibility = View.VISIBLE
+        binding.versionComposeView.visibility = View.VISIBLE
+        isCheckingState.value = true
+        latestVersionState.value = null
+        releaseUrlState.value = null
+        versionIsVisibleState.value = true
+
         fetchLatestVersion()
     }
 
     fun hideCheckLatestView() {
-        binding.checkLatestViewRoot.visibility = View.GONE
-        binding.menuScroll.visibility = View.VISIBLE
+        versionIsVisibleState.value = false
     }
 
-    private fun hideAllOverlays() {
-        val views = listOf(
-            binding.menuScroll,
-            binding.bookmarkManagerRoot,
-            binding.tabManagerRoot,
-            binding.checkLatestViewRoot,
-            binding.settingsViewRoot,
-            binding.qrCodeViewRoot
-        )
-        views.forEach { 
-            it.visibility = View.GONE 
+    private fun onVersionDismissFinished() {
+        if (!versionIsVisibleState.value) {
+            binding.versionComposeView.visibility = View.GONE
+            checkHideMenuOverlay()
         }
     }
 
-    private fun ensureSettingsContentPopulated() {
-        if (binding.settingsContentContainer.childCount > 0) {
-            return
-        }
-        
-        try {
-            val settingsCallbacks = SettingsCallbacks(
-                onClose = { 
-                    hideSettingsView() 
-                },
-                onThemeChanged = { 
-                    callbacks.onRecreateRequested() 
-                },
-                onPageDarkeningChanged = {
-                    val enabled = BrowserPreferences.isBetaForceDarkPagesEnabled(activity)
-                    tabManager.browserTabs.forEach { tab ->
-                        tab.webView.updatePageDarkening(enabled)
-                    }
-                },
-                onScaleChanged = { 
-                    callbacks.onRecreateRequested() 
-                },
-                onHomePageChanged = { 
-                    callbacks.onHomePageChanged() 
-                },
-                onInAppControlsChanged = {
-                    uiManager.applyPersistentAddressBarPreference()
-                    uiManager.applyQuickActionButtonPreferences()
-                },
-                onPickStartPageBackground = {
-                    callbacks.onPickBackgroundRequested()
-                },
-                onClearStartPageBackground = { 
-                    startPageManager.clearStartPageBackground() 
-                },
-                onSponsorsVisibilityChanged = {
-                    startPageManager.refreshStartPage()
-                },
-                onShieldsChanged = {
-                    val enabled = BrowserPreferences.isShieldsEnabled(activity)
-                    tabManager.browserTabs.forEach { tab ->
-                        tab.webView.updateShieldsEnabled(enabled)
-                    }
-                }
-            )
-            
-            val contentView = SettingsViews.createSettingsContent(activity, false, settingsCallbacks)
-            binding.settingsContentContainer.addView(contentView)
-        } catch (e: Exception) {
-            // Log or handle error
+    fun hideAllOverlays() {
+        qrIsVisibleState.value = false
+        versionIsVisibleState.value = false
+        settingsIsVisibleState.value = false
+        binding.qrCodeComposeView.visibility = View.GONE
+        binding.versionComposeView.visibility = View.GONE
+        binding.settingsComposeView.visibility = View.GONE
+        binding.menuComposeView.visibility = View.GONE
+        binding.bookmarkComposeView.visibility = View.GONE
+        binding.tabComposeView.visibility = View.GONE
+        binding.menuOverlay.visibility = View.GONE
+        uiManager.applyFrostedGlassProgress(0f)
+        uiManager.showMenuButtonTemporarily()
+    }
+
+    private fun hideOtherSubScreens() {
+        listOf(binding.menuComposeView, binding.bookmarkComposeView, binding.tabComposeView,
+            binding.qrCodeComposeView, binding.versionComposeView, binding.settingsComposeView)
+            .forEach { it.visibility = View.GONE }
+    }
+
+    private fun checkHideMenuOverlay() {
+        val hasActiveSubScreen = binding.qrCodeComposeView.isVisible ||
+            binding.versionComposeView.isVisible ||
+            binding.settingsComposeView.isVisible ||
+            binding.bookmarkComposeView.isVisible ||
+            binding.tabComposeView.isVisible ||
+            binding.menuComposeView.isVisible
+        if (!hasActiveSubScreen) {
+            callbacks.onDismissOverlaysRequested()
         }
     }
 
     private fun fetchLatestVersion() {
-        Thread {
-            try {
-                val url = java.net.URL("https://api.github.com/repos/kododake/AABrowser/releases/latest")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.setRequestProperty("Accept", "application/vnd.github.v3+json")
-                
-                if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().use { reader ->
-                        reader.readText()
-                    }
-                    val json = org.json.JSONObject(response)
-                    val latestUrl = json.getString("html_url")
-                    val tag = json.getString("tag_name")
-                    
-                    activity.runOnUiThread {
-                        binding.checkLatestProgressIndicator.visibility = View.GONE
-                        val currentVer = com.kododake.aabrowser.BuildConfig.VERSION_NAME.trim().removePrefix("v")
-                        val latestVer = tag.trim().removePrefix("v")
-                        
-                        if (currentVer.equals(latestVer, ignoreCase = true)) {
-                            binding.checkLatestLatestVersion.text = activity.getString(R.string.check_latest_up_to_date, latestVer)
-                            binding.checkLatestLatestVersion.setTextColor(getColorFromAttr(androidx.appcompat.R.attr.colorPrimary))
-                        } else {
-                            binding.checkLatestLatestVersion.text = activity.getString(R.string.check_latest_update_available, tag)
-                            binding.checkLatestLatestVersion.setTextColor(getColorFromAttr(androidx.appcompat.R.attr.colorError))
-                        }
-                        callbacks.onVersionInfoReceived(latestUrl, tag)
-                    }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { 
-                    binding.checkLatestProgressIndicator.visibility = View.GONE 
-                }
+        VersionFetcher.fetchLatestVersion(
+            activity = activity,
+            onSuccess = { latestUrl, tag ->
+                isCheckingState.value = false
+                latestVersionState.value = tag
+                releaseUrlState.value = latestUrl
+                callbacks.onVersionInfoReceived(latestUrl, tag)
+            },
+            onError = {
+                isCheckingState.value = false
             }
-        }.start()
-    }
-
-    private fun getColorFromAttr(attrResId: Int): Int {
-        val tv = android.util.TypedValue()
-        if (activity.theme.resolveAttribute(attrResId, tv, true)) {
-            if (tv.resourceId != 0) {
-                return androidx.core.content.ContextCompat.getColor(activity, tv.resourceId)
-            }
-            return tv.data
-        }
-        return android.graphics.Color.TRANSPARENT
+        )
     }
 }

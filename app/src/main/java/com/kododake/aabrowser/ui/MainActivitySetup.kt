@@ -1,24 +1,64 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.ui
 
+import android.app.Activity
 import android.content.Context
 import android.net.Uri
+import android.webkit.WebView
 import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.kododake.aabrowser.AppConstants
-import com.kododake.aabrowser.MainActivity
 import com.kododake.aabrowser.R
+import com.kododake.aabrowser.bookmarks.BookmarkManager
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.databinding.ActivityMainBinding
-import com.kododake.aabrowser.bookmarks.BookmarkManager
+import com.kododake.aabrowser.navigation.NavigationManager
 import com.kododake.aabrowser.startpage.StartPageManager
 import com.kododake.aabrowser.tabs.TabManager
-import com.kododake.aabrowser.navigation.NavigationManager
 import com.kododake.aabrowser.web.adblock.AdBlocker
 
 class MainActivitySetup(
-    private val activity: MainActivity,
+    private val activity: Activity,
     private val binding: ActivityMainBinding,
-    private val managers: Managers
+    private val managers: Managers,
+    private val actions: Actions
 ) {
+    constructor(
+        activity: Activity,
+        binding: ActivityMainBinding,
+        browserManagers: com.kododake.aabrowser.main.BrowserManagers,
+        actions: Actions
+    ) : this(
+        activity = activity,
+        binding = binding,
+        managers = Managers(
+            bookmarkManager = browserManagers.bookmarkManager,
+            startPageManager = browserManagers.startPageManager,
+            tabManager = browserManagers.tabManager,
+            uiManager = browserManagers.uiManager,
+            navigationManager = browserManagers.navigationManager,
+            overlayManager = browserManagers.overlayManager,
+            overlayCoordinator = browserManagers.overlayCoordinator
+        ),
+        actions = actions
+    )
 
     data class Managers(
         val bookmarkManager: BookmarkManager,
@@ -26,163 +66,140 @@ class MainActivitySetup(
         val tabManager: TabManager,
         val uiManager: BrowserUIManager,
         val navigationManager: NavigationManager,
-        val overlayManager: OverlayManager
+        val overlayManager: OverlayManager,
+        val overlayCoordinator: OverlayNavigationCoordinator
     )
 
-    fun setupClickListeners() {
-        setupNavigationButtons()
-        setupMenuButtons()
-        setupBookmarkButtons()
-        setupOverlayButtons()
-        setupStartPageButtons()
+    data class Actions(
+        val getWebView: () -> WebView?,
+        val getCurrentUrl: () -> String,
+        val getLatestReleaseUrl: () -> String,
+        val updateNavigationButtons: () -> Unit,
+        val handleQuickActionButtonPressed: () -> Unit,
+        val showStartPage: () -> Unit,
+        val onDesktopModeChanged: (Boolean) -> Unit
+    )
+
+    fun initializeUi(
+        intentUrl: String?,
+        shouldForceSessionRestore: Boolean
+    ) {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.webViewContainer) { _, _ ->
+            WindowInsetsCompat.CONSUMED
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(binding.progressComposeView) { _, _ ->
+            WindowInsetsCompat.CONSUMED
+        }
+        managers.tabManager.initializeTabs(
+            intentUrl,
+            BrowserPreferences.getHomePageUrl(activity),
+            BrowserPreferences.getLastVisitedUrl(activity),
+            BrowserPreferences.shouldRestoreTabsOnLaunch(activity),
+            BrowserPreferences.shouldResumeLastPageOnLaunch(activity),
+            shouldForceSessionRestore
+        )
+
+        setupClickListeners()
+        setupComposeMenu()
     }
 
-    private fun setupNavigationButtons() {
-        binding.buttonBack.setOnClickListener {
-            activity.webView?.let { webView ->
-                if (webView.canGoBack()) {
-                    webView.goBack()
+    private fun setupComposeMenu() {
+        val menuActions = com.kododake.aabrowser.ui.compose.screens.menu.MenuActions(
+            onBack = {
+                actions.getWebView()?.let { if (it.canGoBack()) it.goBack() }
+                actions.updateNavigationButtons()
+            },
+            onForward = {
+                actions.getWebView()?.let { if (it.canGoForward()) it.goForward() }
+                actions.updateNavigationButtons()
+            },
+            onReload = {
+                actions.getWebView()?.reload()
+                managers.uiManager.hideMenuOverlay()
+            },
+            onHome = {
+                actions.showStartPage()
+                managers.uiManager.hideMenuOverlay()
+            },
+            onDesktopToggle = { isChecked ->
+                BrowserPreferences.setDesktopMode(activity, isChecked)
+                actions.onDesktopModeChanged(isChecked)
+                managers.uiManager.menuHelper.stateHolder.isDesktopMode = isChecked
+            },
+            onFullscreenToggle = { isChecked ->
+                BrowserPreferences.setFullscreenMode(activity, isChecked)
+                managers.uiManager.setImmersiveMode(isChecked)
+                managers.uiManager.menuHelper.stateHolder.isFullscreenMode = isChecked
+            },
+            onShieldsSiteToggle = { shieldsOn ->
+                val host = managers.uiManager.shieldsSiteHost()
+                if (host != null) {
+                    BrowserPreferences.setShieldsDisabledForHost(activity, host, !shieldsOn)
+                    AdBlocker.refreshSiteAllowlist(activity)
+                    managers.uiManager.refreshShieldsSiteState()
+                    managers.uiManager.hideMenuOverlay()
+                    managers.tabManager.activeTab?.webView?.reload()
                 }
-            }
-            activity.updateNavigationButtonsProxy()
-        }
-        
-        binding.buttonForward.setOnClickListener {
-            activity.webView?.let { webView ->
-                if (webView.canGoForward()) {
-                    webView.goForward()
+            },
+            onNewTab = {
+                managers.tabManager.createNewTab(true)
+                managers.uiManager.hideMenuOverlay()
+            },
+            onTabs = {
+                managers.overlayCoordinator.openTabs(fromMenu = true)
+            },
+            onBookmarks = {
+                managers.overlayCoordinator.openBookmarks(fromMenu = true)
+            },
+            onQrCode = {
+                managers.overlayCoordinator.openQrCode(actions.getCurrentUrl(), fromMenu = true)
+            },
+            onCheckUpdate = {
+                managers.overlayCoordinator.openVersion(fromMenu = true)
+            },
+            onSettings = {
+                managers.overlayCoordinator.openSettings(fromMenu = true)
+            },
+            onNavigate = { url ->
+                managers.navigationManager.navigateToAddress(url, true)
+            },
+            onClose = { managers.uiManager.hideMenuOverlay() },
+            onGitHub = {
+                val uri = Uri.parse(AppConstants.GITHUB_REPO_URL)
+                managers.uiManager.openUriExternally(uri)
+            },
+            onDragDelta = { deltaY ->
+                com.kododake.aabrowser.ui.controllers.MenuDragGestureHelper.handleDragDelta(binding, deltaY)
+            },
+            onDragEnd = { totalDeltaY ->
+                com.kododake.aabrowser.ui.controllers.MenuDragGestureHelper.handleDragEnd(binding, totalDeltaY) {
+                    managers.uiManager.hideMenuOverlay()
                 }
+            },
+            onProgress = { progress ->
+                managers.overlayCoordinator.onScreenProgress(OverlayNavigationCoordinator.OverlayScreen.MENU, progress)
+            },
+            onDismissFinished = {
+                managers.uiManager.onMenuDismissFinished()
             }
-            activity.updateNavigationButtonsProxy()
+        )
+        managers.uiManager.menuHelper.setup(binding.menuComposeView, menuActions)
+        managers.uiManager.menuHelper.setupFab(binding.fabComposeView) {
+            actions.handleQuickActionButtonPressed()
         }
-        
-        binding.buttonReload.setOnClickListener {
-            activity.webView?.reload()
-            managers.uiManager.hideMenuOverlay()
-        }
-    }
-
-    private fun setupMenuButtons() {
-        binding.persistentButtonMenu.setOnClickListener {
-            managers.uiManager.showMenuOverlay()
-        }
-        
-        binding.menuFab.setOnClickListener {
-            activity.handleQuickActionButtonPressedProxy()
-        }
-        
-        binding.buttonClose.setOnClickListener {
-            managers.uiManager.hideMenuOverlay()
-        }
-        
-        binding.menuOverlayScrim.setOnClickListener {
-            managers.uiManager.hideMenuOverlay()
+        managers.uiManager.menuHelper.updateVersion("v${com.kododake.aabrowser.BuildConfig.VERSION_NAME}")
+        val isFullscreen = BrowserPreferences.shouldUseFullscreenMode(activity)
+        managers.uiManager.menuHelper.stateHolder.isFullscreenMode = isFullscreen
+        if (isFullscreen) {
+            managers.uiManager.setImmersiveMode(true)
         }
     }
 
-    private fun setupBookmarkButtons() {
-        binding.buttonBookmarks.setOnClickListener {
-            managers.bookmarkManager.showBookmarkManager()
-        }
-        
-        binding.buttonBookmarkManagerBack.setOnClickListener {
-            managers.bookmarkManager.hideBookmarkManager()
-        }
-        
-        binding.buttonBookmarkAdd.setOnClickListener {
-            managers.bookmarkManager.addBookmarkForCurrentPage()
-        }
-        
-        binding.buttonBookmarkStartPageAdd.setOnClickListener {
-            managers.bookmarkManager.showStartPageSlotPicker(activity.currentUrlProxy)
-        }
-        
-        binding.buttonBookmarkSetHomePage.setOnClickListener {
-            managers.bookmarkManager.setCurrentPageAsHomePage()
-        }
-    }
-
-    private fun setupOverlayButtons() {
-        binding.buttonExternal.setOnClickListener {
-            managers.overlayManager.showQrCodeView(activity.currentUrlProxy)
-        }
-        
-        binding.buttonExternalGithub.setOnClickListener {
-            val uri = Uri.parse(AppConstants.GITHUB_REPO_URL)
-            managers.uiManager.openUriExternally(uri)
-        }
-        
-        binding.buttonSettings.setOnClickListener {
-            managers.overlayManager.showSettingsView()
+    private fun setupClickListeners() {
+        binding.commonScrimView.setOnClickListener {
+            managers.overlayCoordinator.hideAll()
         }
 
-        binding.buttonShieldsSite.setOnClickListener {
-            val host = managers.uiManager.shieldsSiteHost() ?: return@setOnClickListener
-            val disable = !BrowserPreferences.isShieldsDisabledForHost(activity, host)
-            BrowserPreferences.setShieldsDisabledForHost(activity, host, disable)
-            AdBlocker.refreshSiteAllowlist(activity)
-            managers.uiManager.refreshShieldsSiteButton()
-            managers.uiManager.hideMenuOverlay()
-            managers.tabManager.activeTab?.webView?.reload()
-        }
-        
-        binding.buttonCheckLatest.setOnClickListener {
-            managers.overlayManager.showCheckLatestView()
-        }
-        
-        binding.buttonQrCodeBack.setOnClickListener {
-            managers.overlayManager.hideQrCodeView()
-        }
-        
-        binding.buttonCheckLatestBack.setOnClickListener {
-            managers.overlayManager.hideCheckLatestView()
-        }
-        
-        binding.checkLatestOpenReleaseButton.setOnClickListener {
-            val uri = Uri.parse(activity.latestReleaseUrlProxy)
-            managers.uiManager.openUriExternally(uri)
-        }
-    }
-
-    private fun setupStartPageButtons() {
-        binding.buttonTabs.setOnClickListener {
-            managers.tabManager.showTabManager()
-        }
-        
-        binding.buttonTabManagerBack.setOnClickListener {
-            managers.tabManager.hideTabManager()
-        }
-        
-        binding.buttonNewTab.setOnClickListener {
-            managers.tabManager.createNewTab(true)
-            managers.uiManager.hideMenuOverlay()
-        }
-        
-        binding.buttonTabManagerAdd.setOnClickListener {
-            managers.tabManager.createNewTab(true)
-            managers.uiManager.hideMenuOverlay()
-        }
-        
-        binding.buttonStartPage.setOnClickListener {
-            activity.showStartPageProxy()
-            managers.uiManager.hideMenuOverlay()
-        }
-        
-        binding.buttonStartPageResume.setOnClickListener {
-            val resumeUrl = BrowserPreferences.getLastVisitedUrl(activity)
-            if (resumeUrl.isNullOrBlank()) {
-                val message = activity.getString(R.string.start_page_no_last_page)
-                Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
-            } else {
-                managers.navigationManager.loadUrlFromIntent(resumeUrl)
-            }
-        }
-        
-        binding.buttonStartPagePhotoOnly.setOnClickListener {
-            managers.startPageManager.isStartPagePhotoOnlyMode = !managers.startPageManager.isStartPagePhotoOnlyMode
-            managers.startPageManager.applyStartPagePhotoOnlyMode()
-        }
-        
         binding.startPageRoot.setOnClickListener {
             if (managers.startPageManager.isStartPagePhotoOnlyMode) {
                 managers.startPageManager.isStartPagePhotoOnlyMode = false

@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.web
 
 import android.graphics.Bitmap
@@ -18,9 +35,12 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import androidx.webkit.UserAgentMetadata
-import androidx.webkit.WebSettingsCompat
+import androidx.webkit.Navigation
+import androidx.webkit.NavigationListener
+import androidx.webkit.ScriptHandler
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
@@ -28,41 +48,22 @@ import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.web.adblock.AdBlocker
 import com.kododake.aabrowser.web.adblock.ServiceWorkerShields
 import com.kododake.aabrowser.web.adblock.ShieldsRuntime
-
-data class BrowserCallbacks(
-    val onUrlChange: (String) -> Unit = {},
-    val onTitleChange: (String?) -> Unit = {},
-    val onFaviconReceived: (String, Bitmap?) -> Unit = { _, _ -> },
-    val onProgressChange: (Int) -> Unit = {},
-    val onShowDownloadPrompt: (Uri) -> Unit = {},
-    val onError: (Int, String?) -> Unit = { _, _ -> },
-    val onCleartextNavigationRequested: (
-        Uri,
-        allowOnce: () -> Unit,
-        allowHostPermanently: () -> Unit,
-        cancel: () -> Unit
-    ) -> Unit = { _, _, _, cancel -> cancel() },
-    val onEnterFullscreen: (View, WebChromeClient.CustomViewCallback) -> Unit = { _, _ -> },
-    val onExitFullscreen: () -> Unit = {},
-    val onPermissionRequest: (PermissionRequest) -> Unit = { it.deny() },
-    val onGeolocationPermissionRequest: (String?, android.webkit.GeolocationPermissions.Callback?) -> Unit = { _, callback -> callback?.invoke(null, false, false) }
-)
+import java.util.concurrent.atomic.AtomicBoolean
 
 fun configureWebView(
     webView: WebView,
     callbacks: BrowserCallbacks = BrowserCallbacks(),
     useDesktopMode: Boolean = false,
     userAgentProfile: UserAgentProfile = UserAgentProfile.ANDROID_CHROME,
-    allowDarkPages: Boolean = false
+    enableDrmL3Enforcer: Boolean = true
 ) {
-    val appContext = webView.context.applicationContext
-    // Written on the UI thread, read by shouldInterceptRequest on WebView's background thread.
-    val currentPageUrl = java.util.concurrent.atomic.AtomicReference<String?>(null)
-    val currentPageHost = java.util.concurrent.atomic.AtomicReference<String?>(null)
-    val shieldsEnabled = java.util.concurrent.atomic.AtomicBoolean(BrowserPreferences.isShieldsEnabled(appContext))
-
     with(webView) {
         setBackgroundColor(Color.TRANSPARENT)
+
+        if (enableDrmL3Enforcer && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            val handler = WebViewCompat.addDocumentStartJavaScript(this, WebScripts.DRM_L3_ENFORCER_JS, setOf("*"))
+            setTag(R.id.webview_drm_l3_script_handler_tag, handler)
+        }
 
         isHorizontalScrollBarEnabled = false
         isVerticalScrollBarEnabled = true
@@ -96,10 +97,12 @@ fun configureWebView(
             }
         }
 
-        applyPageDarkening(allowDarkPages)
-        applyBrowserIdentity(userAgentProfile, useDesktopMode)
-        // Compile filters in the background. External navigation is gated by
+        UserAgentManager.applyBrowserIdentity(this, userAgentProfile, useDesktopMode)
+
+        // Shields: compile filters in the background. External navigation is gated by
         // loadUrlWhenShieldsReady, so no page requests can bypass the engine.
+        val appContext = context.applicationContext
+        val shieldsEnabled = AtomicBoolean(BrowserPreferences.isShieldsEnabled(appContext))
         setTag(R.id.webview_shields_enabled_tag, shieldsEnabled)
         if (shieldsEnabled.get()) AdBlocker.ensureLoadedAsync(appContext)
         ShieldsRuntime.install(this, shieldsEnabled.get())
@@ -110,153 +113,8 @@ fun configureWebView(
             it.setAcceptThirdPartyCookies(this, true)
         }
 
-        //setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        webViewClient = BrowserWebViewClient(callbacks, shieldsEnabled)
 
-        webViewClient = object : WebViewClient() {
-            override fun shouldInterceptRequest(
-                view: WebView,
-                request: WebResourceRequest
-            ): WebResourceResponse? {
-                if (request.isForMainFrame) {
-                    // Redirects and the first subresources arrive before onPageStarted; keep the
-                    // page context current so third-party checks use the right host.
-                    val target = request.url
-                    currentPageUrl.set(target?.toString())
-                    currentPageHost.set(target?.host)
-                }
-                if (!shieldsEnabled.get()) {
-                    return null
-                }
-                return AdBlocker.interceptOrNull(
-                    requestUrl = request.url,
-                    pageUrl = currentPageUrl.get(),
-                    pageHost = currentPageHost.get(),
-                    isMainFrame = request.isForMainFrame,
-                    requestHeaders = request.requestHeaders
-                )
-            }
-
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                val uri = request.url
-                if (handleCleartextIfNeeded(view, uri, callbacks, onPageStart = false)) {
-                    return true
-                }
-                return handleUri(view, uri)
-            }
-
-            private fun handleUri(view: WebView, uri: Uri?): Boolean {
-                if (uri == null) {
-                    return false
-                }
-                val scheme = uri.scheme?.lowercase()
-                if (scheme == null || scheme in setOf("http", "https", "about", "file", "data", "javascript")) {
-                    return false
-                }
-                return true
-            }
-
-            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                currentPageUrl.set(url)
-                currentPageHost.set(url?.toUri()?.host)
-                if (shieldsEnabled.get()) {
-                    ShieldsRuntime.runFallbackIfNeeded(view)
-                }
-                val stringUrl = url
-                if (stringUrl == null) {
-                    return
-                }
-                val uri = Uri.parse(stringUrl)
-                val scheme = uri.scheme?.lowercase()
-
-                if (scheme == "http") {
-                    val allowedOnce = getTag(R.id.webview_allow_once_uri_tag) as? String
-                    if (allowedOnce == stringUrl) {
-                        setTag(R.id.webview_allow_once_uri_tag, null)
-                    } else if (handleCleartextIfNeeded(view, uri, callbacks, onPageStart = true)) {
-                        return
-                    }
-                }
-            }
-
-            override fun onPageFinished(view: WebView, url: String?) {
-                super.onPageFinished(view, url)
-                currentPageUrl.set(url)
-                currentPageHost.set(url?.toUri()?.host)
-                view.evaluateJavascript(SpeechRecognitionBridge.POLYFILL_JS, null)
-                url?.let(callbacks.onUrlChange)
-            }
-
-            override fun onReceivedError(
-                view: WebView,
-                request: WebResourceRequest,
-                error: WebResourceError
-            ) {
-                if (request.isForMainFrame) {
-                    val code = error.errorCode
-                    val shouldShowErrorPage = when (code) {
-                        WebViewClient.ERROR_HOST_LOOKUP,
-                        WebViewClient.ERROR_CONNECT,
-                        WebViewClient.ERROR_TIMEOUT,
-                        WebViewClient.ERROR_UNKNOWN,
-                        WebViewClient.ERROR_PROXY_AUTHENTICATION -> true
-                        else -> false
-                    }
-
-                    if (shouldShowErrorPage) {
-                        val failed = request.url?.toString().orEmpty()
-                        val message = error.description?.toString().orEmpty()
-                        val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&code=$code&message=${Uri.encode(message)}"
-                        try {
-                            view.loadUrl(assetUrl)
-                        } catch (_: Exception) {
-                            callbacks.onError(code, error.description?.toString())
-                        }
-                        return
-                    }
-                }
-                callbacks.onError(error.errorCode, error.description?.toString())
-            }
-
-            override fun onReceivedHttpError(
-                view: WebView,
-                request: WebResourceRequest,
-                errorResponse: WebResourceResponse
-            ) {
-                if (request.isForMainFrame) {
-                    val code = errorResponse.statusCode
-                    if (code in 400..599 && code != 429) {
-                        val failed = request.url?.toString().orEmpty()
-                        val message = errorResponse.reasonPhrase.orEmpty()
-                        val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&code=$code&message=${Uri.encode(message)}"
-                        try {
-                            view.loadUrl(assetUrl)
-                        } catch (_: Exception) {
-                            callbacks.onError(code, message)
-                        }
-                        return
-                    }
-                }
-            }
-
-            override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) {
-                val activity = view.context as? android.app.Activity
-                if (activity != null && !activity.isFinishing && !activity.isDestroyed) {
-                    SslErrorHandlerHelper.handleSslError(activity, handler, error)
-                } else {
-                    handler.cancel()
-                }
-            }
-
-            override fun onReceivedClientCertRequest(view: WebView, request: android.webkit.ClientCertRequest) {
-                val activity = view.context as? android.app.Activity
-                if (activity != null) {
-                    ClientCertHandler.handleClientCertRequest(activity, request)
-                } else {
-                    request.cancel()
-                }
-            }
-        }
 
         webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -323,27 +181,69 @@ fun configureWebView(
                 isUserGesture: Boolean,
                 resultMsg: Message?
             ): Boolean {
+                if (resultMsg == null) return false
+                val newWebView = callbacks.onCreateNewWindow()
+                if (newWebView != null) {
+                    val transport = resultMsg.obj as? WebView.WebViewTransport
+                    if (transport != null) {
+                        transport.webView = newWebView
+                        resultMsg.sendToTarget()
+                        return true
+                    }
+                } else {
+                    val hitTest = view?.hitTestResult
+                    val extraUrl = hitTest?.extra
+                    if (!extraUrl.isNullOrBlank()) {
+                        view.loadUrl(extraUrl)
+                        return true
+                    }
+                }
                 return false
             }
         }
 
         setDownloadListener(DownloadListener { url, _, _, _, _ ->
-            val uri = url?.takeIf { it.isNotBlank() }?.toUri()
-            if (uri == null) {
-                return@DownloadListener
-            }
+            val uri = url?.takeIf { it.isNotBlank() }?.toUri() ?: return@DownloadListener
             callbacks.onShowDownloadPrompt(uri)
         })
+
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.NAVIGATION_LISTENER)) {
+            WebViewCompat.addNavigationListener(
+                this,
+                ContextCompat.getMainExecutor(context),
+                object : NavigationListener {
+                    override fun onNavigationStarted(navigation: Navigation) {}
+                    override fun onNavigationCompleted(navigation: Navigation) {
+                        val navUrl = navigation.url.takeIf { it.isNotBlank() } ?: navigation.page?.url
+                        navUrl?.let(callbacks.onUrlChange)
+                    }
+                }
+            )
+        }
     }
 }
 
-/** Loads only after Shields has its complete filter engine, without blocking the UI thread. */
+fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
+    UserAgentManager.applyBrowserIdentity(this, profile, enable)
+    reload()
+}
+
+fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
+    UserAgentManager.applyBrowserIdentity(this, profile, desktop)
+    reload()
+}
+
+/**
+ * Loads only after Shields has its complete filter engine, without blocking the UI thread.
+ * [load] performs the actual navigation once the engine is ready (plain [WebView.loadUrl] by default).
+ */
 fun WebView.loadUrlWhenShieldsReady(
     url: String,
-    onWaitingForShields: (Boolean) -> Unit = {}
+    onWaitingForShields: (Boolean) -> Unit = {},
+    load: (String) -> Unit = { loadUrl(it) }
 ) {
     if (!BrowserPreferences.isShieldsEnabled(context)) {
-        loadUrl(url)
+        load(url)
         return
     }
     val target = this
@@ -354,76 +254,14 @@ fun WebView.loadUrlWhenShieldsReady(
         // Closed tabs are removed from their parent and destroyed while filters load.
         if (target.parent != null && target.getTag(R.id.webview_pending_shields_url_tag) == url) {
             target.setTag(R.id.webview_pending_shields_url_tag, null)
-            target.loadUrl(url)
+            load(url)
         }
     }
-}
-
-private fun handleCleartextIfNeeded(view: WebView, uri: Uri?, callbacks: BrowserCallbacks, onPageStart: Boolean = false): Boolean {
-    if (uri == null) {
-        return false
-    }
-    val scheme = uri.scheme?.lowercase()
-    if (scheme == null) {
-        return false
-    }
-    if (scheme != "http") {
-        return false
-    }
-
-    val allowedOnce = view.getTag(R.id.webview_allow_once_uri_tag) as? String
-    if (allowedOnce == uri.toString()) {
-        view.setTag(R.id.webview_allow_once_uri_tag, null)
-        return false
-    }
-
-    val host = uri.host?.lowercase()
-    if (com.kododake.aabrowser.data.BrowserPreferences.isHostAllowedCleartext(view.context, host)) {
-        return false
-    }
-    if (onPageStart) view.stopLoading()
-    val allowOnce = {
-        view.setTag(R.id.webview_allow_once_uri_tag, uri.toString())
-        view.post { view.loadUrlWhenShieldsReady(uri.toString()) }
-        kotlin.Unit
-    }
-    val allowHost = {
-        view.context?.let { ctx ->
-            val hostToStore = uri.host?.lowercase()
-            if (hostToStore != null) com.kododake.aabrowser.data.BrowserPreferences.addAllowedCleartextHost(ctx, hostToStore)
-        }
-        view.setTag(R.id.webview_allow_once_uri_tag, uri.toString())
-        view.post { view.loadUrlWhenShieldsReady(uri.toString()) }
-        kotlin.Unit
-    }
-    val cancel = {
-        if (onPageStart) view.stopLoading()
-        kotlin.Unit
-    }
-    callbacks.onCleartextNavigationRequested(uri, allowOnce, allowHost, cancel)
-    return true
-}
-
-fun WebView.updateDesktopMode(enable: Boolean, profile: UserAgentProfile) {
-    applyBrowserIdentity(profile, enable)
-    reload()
-}
-
-fun WebView.updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
-    applyBrowserIdentity(profile, desktop)
-    reload()
-}
-
-fun WebView.updatePageDarkening(enabled: Boolean) {
-    applyPageDarkening(enabled)
-    reload()
 }
 
 fun WebView.updateShieldsEnabled(enabled: Boolean) {
-    val state = (getTag(R.id.webview_shields_enabled_tag) as? java.util.concurrent.atomic.AtomicBoolean)
-        ?: java.util.concurrent.atomic.AtomicBoolean(enabled).also {
-            setTag(R.id.webview_shields_enabled_tag, it)
-        }
+    val state = (getTag(R.id.webview_shields_enabled_tag) as? AtomicBoolean)
+        ?: AtomicBoolean(enabled).also { setTag(R.id.webview_shields_enabled_tag, it) }
     state.set(enabled)
     if (!enabled) {
         ShieldsRuntime.install(this, false)
@@ -449,103 +287,21 @@ fun WebView.releaseCompletely() {
     destroy()
 }
 
-private fun WebView.applyBrowserIdentity(profile: UserAgentProfile, desktop: Boolean) {
-    setTag(R.id.webview_user_agent_profile_tag, profile.storageKey)
-    settings.userAgentString = buildUserAgent(profile, desktop)
-    settings.useWideViewPort = desktop
-    settings.loadWithOverviewMode = desktop
-    
-    val scalePercent = com.kododake.aabrowser.data.BrowserPreferences.getGlobalScalePercent(context)
-    if (desktop) {
-        setInitialScale(0)
-        settings.textZoom = scalePercent
-    } else {
-        setInitialScale(mobileInitialScalePercent())
-        settings.textZoom = 100
+fun WebView.updateDrmL3Enforcer(enabled: Boolean, reload: Boolean = true) {
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+        val existingHandler = getTag(R.id.webview_drm_l3_script_handler_tag) as? ScriptHandler
+        if (enabled) {
+            if (existingHandler == null) {
+                val handler = WebViewCompat.addDocumentStartJavaScript(this, WebScripts.DRM_L3_ENFORCER_JS, setOf("*"))
+                setTag(R.id.webview_drm_l3_script_handler_tag, handler)
+            }
+        } else {
+            existingHandler?.remove()
+            setTag(R.id.webview_drm_l3_script_handler_tag, null)
+        }
     }
-    
-    applyUserAgentMetadata(profile, desktop)
-}
-
-private fun WebView.mobileInitialScalePercent(): Int {
-    return (context.resources.displayMetrics.density * 100).toInt()
-}
-
-private fun WebView.applyUserAgentMetadata(profile: UserAgentProfile, desktop: Boolean) {
-    if (!WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
-        return
-    }
-
-    val metadata = when (profile) {
-        UserAgentProfile.ANDROID_CHROME -> buildChromeUserAgentMetadata(desktop)
-        UserAgentProfile.SAFARI -> buildSafariLikeUserAgentMetadata(desktop)
-    }
-    WebSettingsCompat.setUserAgentMetadata(settings, metadata)
-}
-
-private fun WebView.applyPageDarkening(enabled: Boolean) {
-    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-        WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, enabled)
+    if (reload) {
+        reload()
     }
 }
 
-private fun buildUserAgent(profile: UserAgentProfile, desktop: Boolean): String {
-    return when (profile) {
-        UserAgentProfile.ANDROID_CHROME -> if (desktop) WINDOWS_CHROME_UA else MOBILE_CHROME_UA
-        UserAgentProfile.SAFARI -> if (desktop) SAFARI_MAC_UA else SAFARI_IOS_UA
-    }
-}
-
-private fun buildChromeUserAgentMetadata(desktop: Boolean): UserAgentMetadata {
-    return UserAgentMetadata.Builder()
-        .setBrandVersionList(chromeBrandVersions())
-        .setFullVersion(CHROME_VERSION)
-        .setPlatform(if (desktop) "Windows" else "Android")
-        .setPlatformVersion(if (desktop) WINDOWS_PLATFORM_VERSION else ANDROID_PLATFORM_VERSION)
-        .setArchitecture(if (desktop) "x86" else "")
-        .setModel("")
-        .setMobile(!desktop)
-        .setBitness(if (desktop) DESKTOP_BITNESS else UserAgentMetadata.BITNESS_DEFAULT)
-        .setWow64(false)
-        .build()
-}
-
-private fun buildSafariLikeUserAgentMetadata(desktop: Boolean): UserAgentMetadata {
-    return UserAgentMetadata.Builder()
-        .setPlatform(if (desktop) "macOS" else "iOS")
-        .setPlatformVersion(if (desktop) MACOS_PLATFORM_VERSION else IOS_PLATFORM_VERSION)
-        .setArchitecture(if (desktop) "arm" else "")
-        .setModel("")
-        .setMobile(!desktop)
-        .setBitness(if (desktop) DESKTOP_BITNESS else UserAgentMetadata.BITNESS_DEFAULT)
-        .setWow64(false)
-        .build()
-}
-
-private fun chromeBrandVersions(): List<UserAgentMetadata.BrandVersion> {
-    val majorVersion = CHROME_VERSION.substringBefore('.')
-    return listOf(
-        UserAgentMetadata.BrandVersion.Builder()
-            .setBrand("Chromium")
-            .setMajorVersion(majorVersion)
-            .setFullVersion(CHROME_VERSION)
-            .build(),
-        UserAgentMetadata.BrandVersion.Builder()
-            .setBrand("Google Chrome")
-            .setMajorVersion(majorVersion)
-            .setFullVersion(CHROME_VERSION)
-            .build()
-    )
-}
-
-private const val DESKTOP_INITIAL_SCALE_PERCENT = 100
-private const val DESKTOP_BITNESS = 64
-private const val CHROME_VERSION = "149.0.0.0"
-private const val ANDROID_PLATFORM_VERSION = "10.0.0"
-private const val WINDOWS_PLATFORM_VERSION = "10.0.0"
-private const val MACOS_PLATFORM_VERSION = "14.0.0"
-private const val IOS_PLATFORM_VERSION = "17.0.0"
-private const val MOBILE_CHROME_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Mobile Safari/537.36"
-private const val WINDOWS_CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_VERSION} Safari/537.36"
-private const val SAFARI_MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
-private const val SAFARI_IOS_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"

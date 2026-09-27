@@ -20,3 +20,11 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 -dontobfuscate
+
+# Preserve LazyList internal fields used for reordering scroll stabilization
+-keepclassmembers class androidx.compose.foundation.lazy.LazyListState {
+    private final androidx.compose.foundation.lazy.LazyListScrollPosition scrollPosition;
+}
+-keepclassmembers class androidx.compose.foundation.lazy.LazyListScrollPosition {
+    private java.lang.Object lastKnownFirstItemKey;
+}

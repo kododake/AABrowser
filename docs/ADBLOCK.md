@@ -52,8 +52,9 @@ subscription state.
 ## Controls
 
 - **Settings → Shields**: global on/off, blocked-this-session counter, manage / add / update lists.
-- **Browser menu → Shields button**: switches blocking off or on for the current site (host and its
-  subdomains) and reloads. Stored alongside the other per-site lists in `BrowserPreferences`.
+- **Browser menu → Shields switch**: switches blocking off or on for the current site (host and its
+  subdomains) and reloads. Stored alongside the other per-site lists in `BrowserPreferences`
+  (`ShieldsPreferences`).
 - `@@||site^$document` rules from the lists switch blocking and cosmetic filtering off for a site
   the same way.
 

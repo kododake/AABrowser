@@ -1,32 +1,36 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.tabs
 
-import android.content.Context
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import androidx.webkit.WebViewCompat
-import androidx.webkit.WebViewFeature
+import androidx.compose.runtime.mutableStateOf
 import com.kododake.aabrowser.R
+import com.kododake.aabrowser.bookmarks.BookmarkIconUtils
 import com.kododake.aabrowser.bookmarks.BookmarkManager
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.databinding.ActivityMainBinding
-import com.kododake.aabrowser.ui.adapters.TabAdapter
-import com.kododake.aabrowser.web.BrowserCallbacks
-import com.kododake.aabrowser.web.configureWebView
-import com.kododake.aabrowser.web.loadUrlWhenShieldsReady
+import com.kododake.aabrowser.model.UserAgentProfile
+import com.kododake.aabrowser.ui.compose.screens.tabs.TabItemUi
 import com.kododake.aabrowser.web.releaseCompletely
 import com.kododake.aabrowser.web.updateDesktopMode
-
-data class BrowserTab(
-    val id: Long,
-    val webView: android.webkit.WebView,
-    val speechBridge: com.kododake.aabrowser.web.SpeechRecognitionBridge,
-    var currentUrl: String = "",
-    var currentTitle: String = ""
-)
+import com.kododake.aabrowser.web.updateUserAgentProfile
 
 class TabManager(
     private val activity: AppCompatActivity,
@@ -35,59 +39,28 @@ class TabManager(
     private val callbacks: TabCallbacks
 ) {
 
-    interface TabCallbacks {
-        fun onTabChanged(tab: BrowserTab)
-        fun buildBrowserCallbacks(tab: BrowserTab): BrowserCallbacks
-        fun onNavigateToUrl(url: String)
-        fun onShowStartPage()
-        fun onHideStartPage()
-        fun onShowMenuOverlay(focusAddressBar: Boolean = false)
-        fun onHideMenuOverlay()
-        fun resolveThemeColor(attrRes: Int): Int
-        fun resolveReadableTextColor(backgroundColor: Int, preferredColor: Int, fallbackColor: Int): Int
-        fun requestSpeechRecognitionMicrophoneAccess(tabId: Long, pageUrl: String?)
-        fun onSpeechTabClosed(tabId: Long)
-        fun sanitizeJsExternalUrl(sourceWebView: android.webkit.WebView, rawUrl: String?): android.net.Uri?
-        fun openUriExternally(uri: android.net.Uri)
-        fun updateNavigationButtons()
-        fun applyPersistentAddressBarPreference()
-        fun syncAddressFieldsFrom(source: com.google.android.material.textfield.TextInputEditText)
-        fun updateAddressClearButtons()
-        fun updateConnectionSecurityIcon(url: String?)
-        fun showMenuButtonTemporarily()
-    }
-
     val browserTabs = mutableListOf<BrowserTab>()
     var activeTabId: Long? = null
     private var nextTabId: Long = 1L
 
-    private val tabAdapter: TabAdapter by lazy {
-        TabAdapter(
-            bookmarkManager = bookmarkManager,
-            activeTabIdProvider = { activeTabId },
-            onTabClick = { tab ->
-                switchToTab(tab.id)
-                callbacks.onHideMenuOverlay()
-            },
-            onTabClose = { tab ->
-                closeTab(tab.id) {
-                    callbacks.onSpeechTabClosed(tab.id)
-                }
-            },
-            onReordered = { newList ->
-                browserTabs.clear()
-                browserTabs.addAll(newList)
-                persistTabSession()
-            },
-            resolveThemeColor = callbacks::resolveThemeColor,
-            resolveReadableTextColor = callbacks::resolveReadableTextColor
-        )
-    }
+    internal val isOpenedFromMenuState = mutableStateOf(false)
+    val isOpenedFromMenu: Boolean
+        get() = isOpenedFromMenuState.value
+
+    internal val isVisibleState = mutableStateOf(false)
+    internal val keepScrimState = mutableStateOf(false)
+    internal val tabsState = mutableStateOf<List<TabItemUi>>(emptyList())
 
     val activeTab: BrowserTab?
-        get() {
-            return browserTabs.firstOrNull { it.id == activeTabId }
-        }
+        get() = browserTabs.firstOrNull { it.id == activeTabId }
+
+    init {
+        setupComposeTabs()
+    }
+
+    private fun setupComposeTabs() {
+        TabComposeHelper.setupComposeTabs(this, activity, binding, callbacks)
+    }
 
     fun initializeTabs(
         intentUrl: String?,
@@ -97,55 +70,21 @@ class TabManager(
         resumeLastPageOnLaunch: Boolean,
         shouldForceSessionRestore: Boolean
     ) {
-        setupRecyclerView()
-        
-        val shouldRestoreSavedTabs = shouldForceSessionRestore ||
-            (intentUrl == null && homePageUrl.isNullOrBlank() && restoreTabsOnLaunch)
-            
-        val savedTabs = if (shouldRestoreSavedTabs) {
-            BrowserPreferences.getSavedTabSession(activity)
-        } else {
-            emptyList()
-        }
-
-        when {
-            intentUrl != null -> {
-                createBrowserTab(initialUrl = BrowserPreferences.formatNavigableUrl(intentUrl), activate = true)
-            }
-            !homePageUrl.isNullOrBlank() -> {
-                createBrowserTab(initialUrl = homePageUrl, activate = true)
-            }
-            savedTabs.isNotEmpty() -> {
-                savedTabs.forEach { entry ->
-                    createBrowserTab(initialUrl = entry.url, initialTitle = entry.title.orEmpty(), activate = false)
-                }
-                val savedActiveIndex = BrowserPreferences.getSavedActiveTabIndex(activity)
-                val targetIndex = savedActiveIndex.coerceIn(0, browserTabs.lastIndex)
-                switchToTab(browserTabs[targetIndex].id)
-            }
-            resumeLastPageOnLaunch && !lastVisitedUrl.isNullOrBlank() -> {
-                createBrowserTab(initialUrl = lastVisitedUrl, activate = true)
-            }
-            else -> {
-                createBrowserTab(initialUrl = null, initialTitle = activity.getString(R.string.tab_manager_blank_title), activate = true)
-            }
-        }
-    }
-
-    private fun setupRecyclerView() {
-        binding.tabManagerList.apply {
-            layoutManager = LinearLayoutManager(activity)
-            adapter = tabAdapter
-        }
-
-        val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0) {
-            override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
-                tabAdapter.onItemMove(viewHolder.bindingAdapterPosition, target.bindingAdapterPosition)
-                return true
-            }
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
-        })
-        touchHelper.attachToRecyclerView(binding.tabManagerList)
+        TabInitializer.initialize(
+            context = activity,
+            intentUrl = intentUrl,
+            homePageUrl = homePageUrl,
+            lastVisitedUrl = lastVisitedUrl,
+            restoreTabsOnLaunch = restoreTabsOnLaunch,
+            resumeLastPageOnLaunch = resumeLastPageOnLaunch,
+            shouldForceSessionRestore = shouldForceSessionRestore,
+            createTab = { url, title, activate ->
+                createBrowserTab(url, title, activate)
+            },
+            switchToTab = ::switchToTab,
+            getTabIdAtIndex = { idx -> browserTabs.getOrNull(idx)?.id },
+            getTabsCount = { browserTabs.size }
+        )
     }
 
     fun createBrowserTab(initialUrl: String?, initialTitle: String = "", activate: Boolean): BrowserTab? {
@@ -156,36 +95,20 @@ class TabManager(
             return null
         }
 
-        val tabView = android.webkit.WebView(activity).apply {
-            layoutParams = android.widget.FrameLayout.LayoutParams(-1, -1)
-            overScrollMode = View.OVER_SCROLL_NEVER
-            visibility = View.GONE
-        }
-
-        lateinit var tab: BrowserTab
-        val speechBridge = com.kododake.aabrowser.web.SpeechRecognitionBridge(tabView) { pageUrl ->
-            callbacks.requestSpeechRecognitionMicrophoneAccess(tab.id, pageUrl)
-        }
-        
-        tab = BrowserTab(
-            id = nextTabId++,
-            webView = tabView,
-            speechBridge = speechBridge,
-            currentUrl = initialUrl.orEmpty(),
-            currentTitle = initialTitle
+        val tab = BrowserTabFactory.createTab(
+            context = activity,
+            tabId = nextTabId++,
+            initialUrl = initialUrl,
+            initialTitle = initialTitle,
+            activate = activate,
+            createBrowserCallbacks = callbacks::buildBrowserCallbacks,
+            onRequestSpeechMicrophone = callbacks::requestSpeechRecognitionMicrophoneAccess,
+            onSanitizeJsExternalUrl = callbacks::sanitizeJsExternalUrl,
+            onOpenUriExternally = callbacks::openUriExternally,
+            onShowMenuButtonTemporarily = callbacks::showMenuButtonTemporarily
         )
 
-        configureWebView(tabView, callbacks.buildBrowserCallbacks(tab), BrowserPreferences.shouldUseDesktopMode(activity), BrowserPreferences.getUserAgentProfile(activity), BrowserPreferences.isBetaForceDarkPagesEnabled(activity))
-        setupWebMessageListener(tabView, speechBridge)
-        setupJavascriptInterface(tabView)
-
-        tabView.setOnTouchListener { _, _ ->
-            callbacks.showMenuButtonTemporarily()
-            false
-        }
-        tabView.onPause()
-
-        binding.webViewContainer.addView(tabView)
+        binding.webViewContainer.addView(tab.webView)
         browserTabs.add(tab)
 
         if (activate) {
@@ -197,92 +120,32 @@ class TabManager(
         return tab
     }
 
-    private fun setupWebMessageListener(webView: android.webkit.WebView, speechBridge: com.kododake.aabrowser.web.SpeechRecognitionBridge) {
-        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-            WebViewCompat.addWebMessageListener(webView, com.kododake.aabrowser.web.SpeechRecognitionBridge.BRIDGE_OBJECT_NAME, setOf("*")) { webViewInstance, message, sourceOrigin, isMainFrame, _ ->
-                speechBridge.handleWebMessage(message, sourceOrigin, isMainFrame, webViewInstance.url)
-            }
-        }
-    }
-
-    private fun setupJavascriptInterface(webView: android.webkit.WebView) {
-        webView.addJavascriptInterface(object {
-            @android.webkit.JavascriptInterface
-            fun openExternal(url: String) {
-                activity.runOnUiThread {
-                    val safeUri = callbacks.sanitizeJsExternalUrl(webView, url)
-                    if (safeUri != null) {
-                        callbacks.openUriExternally(safeUri)
-                    }
-                }
-            }
-        }, "Android")
-    }
-
     fun createNewTab(activate: Boolean): BrowserTab? {
         val initialUrl = BrowserPreferences.getHomePageUrl(activity)
         return createBrowserTab(initialUrl, if (initialUrl.isNullOrBlank()) activity.getString(R.string.tab_manager_blank_title) else "", activate)
     }
 
     fun switchToTab(tabId: Long) {
-        val selectedTab = browserTabs.firstOrNull { it.id == tabId }
-        if (selectedTab == null) {
-            return
-        }
-        val currentActiveWebView = activeTab?.webView
-        if (currentActiveWebView !== selectedTab.webView) {
-            currentActiveWebView?.onPause()
-        }
-
-        activeTabId = selectedTab.id
-
-        browserTabs.forEach { tab ->
-            tab.webView.visibility = if (tab.id == selectedTab.id) View.VISIBLE else View.GONE
-        }
-        selectedTab.webView.onResume()
-
-        if (binding.addressEdit.text?.toString() != selectedTab.currentUrl) {
-            binding.addressEdit.setText(selectedTab.currentUrl)
-            binding.addressEdit.setSelection(selectedTab.currentUrl.length)
-        }
-        
-        callbacks.syncAddressFieldsFrom(binding.addressEdit)
-        callbacks.updateAddressClearButtons()
-
-        if (selectedTab.currentUrl.isBlank()) {
-            callbacks.onShowStartPage()
-        } else {
-            callbacks.onHideStartPage()
-            if (selectedTab.webView.url.isNullOrBlank()) {
-                selectedTab.webView.loadUrlWhenShieldsReady(selectedTab.currentUrl, ::showShieldsLoading)
-            } else {
-                binding.pageTitle.text = selectedTab.currentTitle.ifBlank { displayTitleForTab(selectedTab) }
-                callbacks.updateConnectionSecurityIcon(selectedTab.currentUrl)
-            }
-        }
-
+        TabSwitcher.switchToTab(
+            tabId = tabId,
+            browserTabs = browserTabs,
+            activeTabId = activeTabId,
+            binding = binding,
+            callbacks = callbacks,
+            displayTitleForTab = ::displayTitleForTab,
+            onActiveTabChanged = { activeTabId = it }
+        )
         persistTabSession()
         refreshTabs()
-        callbacks.updateNavigationButtons()
-        callbacks.applyPersistentAddressBarPreference()
-        callbacks.onTabChanged(selectedTab)
-    }
-
-    private fun showShieldsLoading(waiting: Boolean) {
-        binding.progressIndicator.isIndeterminate = waiting
-        binding.progressIndicator.visibility = if (waiting) View.VISIBLE else View.GONE
-        binding.loadingRulesLabel.visibility = if (waiting) View.VISIBLE else View.GONE
     }
 
     fun closeTab(tabId: Long, onSpeechTabClosed: () -> Unit) {
         val index = browserTabs.indexOfFirst { it.id == tabId }
-        if (index < 0) {
-            return
-        }
+        if (index < 0) return
 
         val removedTab = browserTabs.removeAt(index)
         onSpeechTabClosed()
-        
+
         removedTab.speechBridge.destroy()
         binding.webViewContainer.removeView(removedTab.webView)
         removedTab.webView.releaseCompletely()
@@ -302,22 +165,18 @@ class TabManager(
     }
 
     fun persistTabSession() {
-        val entries = browserTabs.map { BrowserPreferences.TabSessionEntry(it.currentUrl.takeIf { u -> u.isNotBlank() }, it.currentTitle.takeIf { t -> t.isNotBlank() }) }
-        val activeIndex = browserTabs.indexOfFirst { it.id == activeTabId }.coerceAtLeast(0)
-        BrowserPreferences.persistTabSession(activity, entries, activeIndex)
+        TabStateStore.persistTabSession(activity, browserTabs, activeTabId)
     }
 
     fun refreshTabs() {
-        val count = browserTabs.size.coerceAtLeast(1)
-        binding.buttonTabs.text = if (count > 1) "${activity.getString(R.string.menu_tabs)} ($count)" else activity.getString(R.string.menu_tabs)
-
-        val canAdd = browserTabs.size < BrowserPreferences.MAX_OPEN_TABS
-        listOf(binding.buttonNewTab, binding.buttonTabManagerAdd).forEach {
-            it.isEnabled = canAdd
-            it.alpha = if (canAdd) 1.0f else 0.6f
+        tabsState.value = browserTabs.map { tab ->
+            TabItemUi(
+                id = tab.id,
+                title = displayTitleForTab(tab),
+                url = tab.currentUrl,
+                isActive = (tab.id == activeTabId)
+            )
         }
-
-        tabAdapter.submitList(browserTabs.toList())
     }
 
     fun displayTitleForTab(tab: BrowserTab): String {
@@ -328,14 +187,106 @@ class TabManager(
         }
     }
 
-    fun showTabManager() {
-        listOf(binding.menuScroll, binding.bookmarkManagerRoot, binding.qrCodeViewRoot, binding.checkLatestViewRoot, binding.settingsViewRoot).forEach { it.visibility = View.GONE }
-        binding.tabManagerRoot.visibility = View.VISIBLE
+    fun showTabManager(fromMenu: Boolean = false) {
+        isOpenedFromMenuState.value = fromMenu
+        binding.menuComposeView.visibility = View.GONE
+        binding.bookmarkComposeView.visibility = View.GONE
+        binding.qrCodeComposeView.visibility = View.GONE
+        binding.versionComposeView.visibility = View.GONE
+        binding.settingsComposeView.visibility = View.GONE
+        binding.menuOverlay.visibility = View.VISIBLE
+        binding.tabComposeView.visibility = View.VISIBLE
+        isVisibleState.value = true
         refreshTabs()
     }
 
+    fun returnToMenu() {
+        keepScrimState.value = true
+        isVisibleState.value = false
+        binding.tabComposeView.visibility = View.GONE
+        callbacks.onReturnToMenuRequested()
+    }
+
+    fun reorderTabs(fromIndex: Int, toIndex: Int) {
+        if (fromIndex in browserTabs.indices && toIndex in browserTabs.indices && fromIndex != toIndex) {
+            val moved = browserTabs.removeAt(fromIndex)
+            browserTabs.add(toIndex, moved)
+            refreshTabs()
+        }
+    }
+
+    fun commitTabReorder() {
+        persistTabSession()
+    }
+
     fun hideTabManager() {
-        binding.tabManagerRoot.visibility = View.GONE
-        binding.menuScroll.visibility = View.VISIBLE
+        isOpenedFromMenuState.value = false
+        isVisibleState.value = false
+    }
+
+    internal fun onTabDismissFinished() {
+        val returningToMenu = keepScrimState.value
+        keepScrimState.value = false
+        if (!isVisibleState.value) {
+            binding.tabComposeView.visibility = View.GONE
+            if (!returningToMenu) {
+                callbacks.onDismissOverlaysRequested()
+            }
+        }
+    }
+
+    internal inline fun dismissTabManagerToPage(action: () -> Unit) {
+        isOpenedFromMenuState.value = false
+        hideTabManager()
+        action()
+        callbacks.onHideMenuOverlay()
+        binding.tabComposeView.visibility = View.GONE
+        binding.menuComposeView.visibility = View.GONE
+        binding.menuOverlay.visibility = View.GONE
+        callbacks.showMenuButtonTemporarily()
+    }
+
+    fun updateTabUrl(tabId: Long, url: String) {
+        val index = browserTabs.indexOfFirst { it.id == tabId }
+        if (index >= 0) {
+            browserTabs[index] = browserTabs[index].copy(currentUrl = url)
+            persistTabSession()
+        }
+    }
+
+    fun updateTabTitle(tabId: Long, title: String) {
+        val index = browserTabs.indexOfFirst { it.id == tabId }
+        if (index >= 0) {
+            browserTabs[index] = browserTabs[index].copy(currentTitle = title)
+            persistTabSession()
+        }
+    }
+
+    fun updateTabUrlAndTitle(tabId: Long, url: String, title: String) {
+        val index = browserTabs.indexOfFirst { it.id == tabId }
+        if (index >= 0) {
+            browserTabs[index] = browserTabs[index].copy(currentUrl = url, currentTitle = title)
+            persistTabSession()
+        }
+    }
+
+    fun resetActiveTabSession(newUrl: String): BrowserTab? =
+        TabSessionResetter.resetActiveTab(activity, binding, browserTabs, activeTabId, callbacks, newUrl)
+
+    fun destroy() {
+        browserTabs.forEach { tab ->
+            tab.speechBridge.destroy()
+            tab.webView.releaseCompletely()
+        }
+        binding.webViewContainer.removeAllViews()
+        browserTabs.clear()
+    }
+
+    fun updateDesktopMode(desktop: Boolean, profile: UserAgentProfile) {
+        browserTabs.forEach { tab -> tab.webView.updateDesktopMode(desktop, profile) }
+    }
+
+    fun updateUserAgentProfile(profile: UserAgentProfile, desktop: Boolean) {
+        browserTabs.forEach { tab -> tab.webView.updateUserAgentProfile(profile, desktop) }
     }
 }

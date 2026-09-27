@@ -31,9 +31,6 @@
     <color name="theme_surface_container_highest">#FF1A1A1A</color>
     <color name="qr_code_background">#FFFFFFFF</color>
     <color name="menu_overlay_scrim">#A6000000</color>
-    <color name="start_page_gradient_start">#0D1E2C</color>
-    <color name="start_page_gradient_center">#123B45</color>
-    <color name="start_page_gradient_end">#7A4A2C</color>
     <color name="launcher_background_fill">#2C8F5D</color>
     <color name="launcher_grid_stroke">#66FFFFFF</color>
 </resources>

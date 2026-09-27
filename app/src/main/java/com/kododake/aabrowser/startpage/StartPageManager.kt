@@ -1,33 +1,36 @@
+/*
+ * Copyright (C) 2025 AABrowser Contributors (https://github.com/kododake/AABrowser)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://gnu.org>.
+ */
+
 package com.kododake.aabrowser.startpage
 
-import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.net.Uri
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.graphics.ColorUtils
-import androidx.core.view.isVisible
-import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.RecyclerView
+import androidx.compose.runtime.mutableStateOf
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.bookmarks.BookmarkManager
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.databinding.ActivityMainBinding
-import com.kododake.aabrowser.ui.adapters.StartPageAdapter
-import com.kododake.aabrowser.ui.adapters.SlotItem
-import com.kododake.aabrowser.data.SiteIconCache
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.kododake.aabrowser.ui.QRUtils
+import com.kododake.aabrowser.ui.compose.screens.startpage.StartPageScreenCallbacks
+import com.kododake.aabrowser.ui.compose.screens.startpage.StartPageSlotUi
+import com.kododake.aabrowser.ui.compose.screens.startpage.StartPageViews
 
 class StartPageManager(
     private val activity: AppCompatActivity,
@@ -46,7 +49,6 @@ class StartPageManager(
         fun getCurrentUrl(): String
         fun resolveThemeColor(attrRes: Int): Int
         fun updateNavigationButtons()
-        fun updateConnectionSecurityIcon(url: String?)
         fun showMenuButtonTemporarily()
         fun loadUrlFromIntent(url: String)
         fun resolveReadableTextColor(bg: Int, pr: Int, fb: Int): Int
@@ -54,81 +56,122 @@ class StartPageManager(
 
     var isShowingStartPage: Boolean = false
     var isStartPagePhotoOnlyMode: Boolean = false
-    
-    private var loadedStartPageBackgroundUri: String? = null
-    private var loadedStartPageBackgroundBitmap: Bitmap? = null
-    private var cachedStartPageGradientSignature: Int = 0
 
-    private val sponsorsManager = SponsorsManager(activity, binding, object : SponsorsManager.SponsorsCallbacks {
-        override fun loadUrlFromIntent(url: String) = callbacks.loadUrlFromIntent(url)
-        override fun resolveThemeColor(attrRes: Int) = callbacks.resolveThemeColor(attrRes)
-    })
+    private val backgroundRenderer = StartPageBackgroundRenderer(
+        activity = activity,
+        binding = binding,
+        resolveThemeColor = callbacks::resolveThemeColor
+    )
 
-    private val startPageAdapter: StartPageAdapter by lazy {
-        StartPageAdapter(
-            bookmarkManager = bookmarkManager,
-            onSlotClick = { url ->
-                if (url.isEmpty()) {
-                    callbacks.onShowMenuOverlay()
-                    bookmarkManager.showBookmarkManager()
-                } else {
-                    callbacks.loadUrlFromIntent(url)
-                }
-            },
-            onReordered = { newList ->
-                syncBookmarksFromSlots(newList.map { it.url })
-            },
-            resolveThemeColor = callbacks::resolveThemeColor
-        )
-    }
+    val navigationLoader = StartPageNavigationLoader(
+        loadingOverlayView = binding.navigationLoadingOverlay,
+        startPageRootView = binding.startPageRoot,
+        customBackgroundBitmapProvider = { backgroundRenderer.customBackgroundBitmap }
+    )
 
-    private var backgroundLoadJob: Job? = null
+    val isNavigatingState get() = navigationLoader.isNavigatingState
+    val isNavigating: Boolean get() = navigationLoader.isNavigating
+
+    private var composeStartPageView: View? = null
 
     fun onDestroy() {
-        backgroundLoadJob?.cancel()
-        backgroundLoadJob = null
-        loadedStartPageBackgroundBitmap?.recycle()
-        loadedStartPageBackgroundBitmap = null
-        loadedStartPageBackgroundUri = null
+        navigationLoader.onDestroy()
+        backgroundRenderer.onDestroy()
+        composeStartPageView?.let { binding.startPageRoot.removeView(it) }
+        composeStartPageView = null
     }
 
-    private fun setupRecyclerView() {
-        if (binding.startPageQuickLinksContainer.adapter != null) {
-            return
-        }
-        
-        binding.startPageQuickLinksContainer.apply {
-            layoutManager = GridLayoutManager(activity, 2)
-            adapter = startPageAdapter
-        }
-
-        val touchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
-            ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT, 0
-        ) {
-            override fun onMove(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
-                startPageAdapter.onItemMove(viewHolder.bindingAdapterPosition, target.bindingAdapterPosition)
-                return true
+    private fun ensureComposeStartPagePopulated() {
+        if (composeStartPageView == null) {
+            val slots = BrowserPreferences.getStartPageSlots(activity).mapIndexed { index, url ->
+                val cleanUrl = url.orEmpty()
+                val title = if (cleanUrl.isNotBlank()) bookmarkManager.resolveBookmarkTitle(cleanUrl) else ""
+                val label = if (cleanUrl.isNotBlank()) bookmarkManager.displayLabelForUrl(cleanUrl) else ""
+                StartPageSlotUi(
+                    id = index,
+                    index = index,
+                    url = url,
+                    title = title,
+                    label = label
+                )
             }
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
-        })
-        touchHelper.attachToRecyclerView(binding.startPageQuickLinksContainer)
+            val hasResumePage = !BrowserPreferences.getLastVisitedUrl(activity).isNullOrBlank()
+            val qrBitmap = QRUtils.generateQrCode("https://github.com/sponsors/kododake", 200)
+
+            val screenCallbacks = StartPageScreenCallbacks(
+                onNavigate = { url -> callbacks.loadUrlFromIntent(url) },
+                onSlotClick = { _, url ->
+                    if (url.isNullOrBlank()) {
+                        callbacks.onShowMenuOverlay()
+                        bookmarkManager.showBookmarkManager()
+                    } else {
+                        callbacks.loadUrlFromIntent(url)
+                    }
+                },
+                onMoveSlot = { fromIdx, toIdx ->
+                    val currentSlots = BrowserPreferences.getStartPageSlots(activity).toMutableList()
+                    if (fromIdx in currentSlots.indices && toIdx in currentSlots.indices && fromIdx != toIdx) {
+                        val moved = currentSlots.removeAt(fromIdx)
+                        currentSlots.add(toIdx, moved)
+                        BrowserPreferences.setStartPageSlots(activity, currentSlots)
+                    }
+                },
+                onClearSlot = { idx ->
+                    BrowserPreferences.clearStartPageSlot(activity, idx)
+                    refreshStartPage()
+                },
+                onResumeClick = {
+                    val last = BrowserPreferences.getLastVisitedUrl(activity)
+                    if (!last.isNullOrBlank()) {
+                        callbacks.loadUrlFromIntent(last)
+                    }
+                },
+                onPhotoOnlyToggle = {
+                    isStartPagePhotoOnlyMode = !isStartPagePhotoOnlyMode
+                    applyStartPagePhotoOnlyMode()
+                },
+                onOpenSponsors = { url ->
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        activity.startActivity(intent)
+                    } catch (_: Exception) {
+                        Toast.makeText(activity, R.string.error_generic_message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+
+            val view = StartPageViews.createStartPageContent(
+                context = activity,
+                slots = slots,
+                hasResumePage = hasResumePage,
+                sponsorsQrBitmap = qrBitmap,
+                customBackgroundBitmapState = backgroundRenderer.customBackgroundBitmapState,
+                customBackgroundBitmapProvider = { backgroundRenderer.customBackgroundBitmap },
+                isNavigatingState = isNavigatingState,
+                callbacks = screenCallbacks
+            )
+            composeStartPageView = view
+            binding.startPageRoot.addView(view)
+        }
     }
 
-    private fun syncBookmarksFromSlots(slotUrls: List<String>) {
-        slotUrls.forEachIndexed { index, url ->
-            BrowserPreferences.setStartPageSlot(activity, index, url.takeIf { it.isNotEmpty() })
-        }
-        
-        val allBookmarks = BrowserPreferences.getBookmarks(activity).toMutableList()
-        val nonSlotBookmarks = allBookmarks.filter { it !in slotUrls.filter { s -> s.isNotEmpty() } }
-        
-        val newOrder = mutableListOf<String>()
-        slotUrls.filter { it.isNotEmpty() }.forEach { newOrder.add(it) }
-        newOrder.addAll(nonSlotBookmarks)
-        
-        BrowserPreferences.setBookmarks(activity, newOrder)
-        bookmarkManager.refreshBookmarks()
+
+    fun beginNavigationLoading(fromStartPage: Boolean = isShowingStartPage, onComplete: (() -> Unit)? = null) {
+        navigationLoader.beginLoading(fromStartPage = fromStartPage, onComplete = onComplete)
     }
+
+    fun cancelNavigationLoading() {
+        navigationLoader.cancelLoading()
+        if (binding.startPageRoot.visibility == View.VISIBLE) {
+            isShowingStartPage = true
+            callbacks.updateNavigationButtons()
+        }
+    }
+
+    fun onProgressChanged(progress: Int) = navigationLoader.onWebProgress(progress)
+
+    fun finishNavigationLoading() = navigationLoader.finishLoading()
 
     fun showStartPage() {
         val homePageUrl = BrowserPreferences.getHomePageUrl(activity)
@@ -138,18 +181,16 @@ class StartPageManager(
             callbacks.loadUrlFromIntent(homePageUrl)
             return
         }
-        
+
         if (callbacks.isInFullscreen()) {
             callbacks.onExitFullscreen()
         }
-        
+
+        navigationLoader.cancelLoading()
         isShowingStartPage = true
         isStartPagePhotoOnlyMode = false
         binding.startPageRoot.visibility = View.VISIBLE
-        binding.pageTitle.text = activity.getString(R.string.start_page_title)
-        binding.addressEdit.setText("")
-        
-        callbacks.updateConnectionSecurityIcon(null)
+
         refreshStartPage()
         applyStartPagePhotoOnlyMode()
         callbacks.updateNavigationButtons()
@@ -160,39 +201,21 @@ class StartPageManager(
         if (!isShowingStartPage && binding.startPageRoot.visibility != View.VISIBLE) {
             return
         }
-        
+
         isShowingStartPage = false
         isStartPagePhotoOnlyMode = false
         applyStartPagePhotoOnlyMode()
         binding.startPageRoot.visibility = View.GONE
-        
-        binding.pageTitle.text = currentPageTitle.ifBlank {
-            currentUrl.takeIf { it.isNotBlank() }?.let { bookmarkManager.displayLabelForUrl(it) }.orEmpty()
-        }
-        
-        if (currentUrl.isNotBlank()) {
-            if (binding.addressEdit.text?.toString() != currentUrl) {
-                binding.addressEdit.setText(currentUrl)
-                binding.addressEdit.setSelection(currentUrl.length)
-            }
-        } else {
-            binding.addressEdit.setText("")
-        }
-        
-        val iconUrl = currentUrl.takeIf { bookmarkManager.isActiveWebsiteUrl(it) }
-        callbacks.updateConnectionSecurityIcon(iconUrl)
+
         callbacks.updateNavigationButtons()
         bookmarkManager.refreshBookmarks()
     }
 
     fun applyStartPagePhotoOnlyMode() {
         val visibility = if (isStartPagePhotoOnlyMode) View.GONE else View.VISIBLE
-        binding.startPageScroll.visibility = visibility
-        binding.startPageDimOverlay.visibility = visibility
-        
-        binding.buttonStartPagePhotoOnly.text = activity.getString(
-            if (isStartPagePhotoOnlyMode) R.string.start_page_show_ui else R.string.start_page_photo_only
-        )
+        composeStartPageView?.visibility = visibility
+        val hasCustomBg = !BrowserPreferences.getStartPageBackgroundUri(activity).isNullOrBlank()
+        binding.startPageDimOverlay.visibility = if (hasCustomBg && !isStartPagePhotoOnlyMode) View.VISIBLE else View.GONE
 
         if (!isStartPagePhotoOnlyMode && isShowingStartPage) {
             callbacks.showMenuButtonTemporarily()
@@ -200,194 +223,28 @@ class StartPageManager(
     }
 
     fun refreshStartPage() {
-        setupRecyclerView()
-        refreshStartPageQuickLinks()
-        refreshStartPageBackground()
-        refreshStartPageResumeButton()
-        sponsorsManager.setupSponsorsSection()
-        setupStartPageCardGlassBackground()
-    }
-
-    private fun setupStartPageCardGlassBackground() {
-        val cardBg = callbacks.resolveThemeColor(com.google.android.material.R.attr.colorSurfaceContainerLow)
-        val glassBg = androidx.core.graphics.ColorUtils.setAlphaComponent(cardBg, 120)
-        
-        binding.startPageCard.setCardBackgroundColor(glassBg)
-        val outlineColor = callbacks.resolveThemeColor(com.google.android.material.R.attr.colorOutline)
-        binding.startPageCard.strokeColor = androidx.core.graphics.ColorUtils.setAlphaComponent(outlineColor, 80)
-        binding.startPageCard.strokeWidth = (1.5f * activity.resources.displayMetrics.density).toInt()
-
-        binding.startPageSponsorsCard.setCardBackgroundColor(glassBg)
-        binding.startPageSponsorsCard.strokeColor = androidx.core.graphics.ColorUtils.setAlphaComponent(outlineColor, 80)
-        binding.startPageSponsorsCard.strokeWidth = (1.5f * activity.resources.displayMetrics.density).toInt()
-
-        binding.startPageSponsorsListCard.setCardBackgroundColor(glassBg)
-        binding.startPageSponsorsListCard.strokeColor = androidx.core.graphics.ColorUtils.setAlphaComponent(outlineColor, 80)
-        binding.startPageSponsorsListCard.strokeWidth = (1.5f * activity.resources.displayMetrics.density).toInt()
-
-        binding.startPageSponsorsHiddenPienCard.setCardBackgroundColor(glassBg)
-        binding.startPageSponsorsHiddenPienCard.strokeColor = androidx.core.graphics.ColorUtils.setAlphaComponent(outlineColor, 80)
-        binding.startPageSponsorsHiddenPienCard.strokeWidth = (1.5f * activity.resources.displayMetrics.density).toInt()
+        if (isNavigating) return
+        backgroundRenderer.refreshStartPageBackground()
+        composeStartPageView?.let { binding.startPageRoot.removeView(it) }
+        composeStartPageView = null
+        if (isShowingStartPage) {
+            ensureComposeStartPagePopulated()
+        }
     }
 
     fun refreshStartPageBackground() {
-        applyDynamicStartPageGradientBackground()
-        val backgroundUri = BrowserPreferences.getStartPageBackgroundUri(activity)
-        
-        if (backgroundUri.isNullOrBlank()) {
-            clearBackground()
-            return
-        }
-
-        if (backgroundUri == loadedStartPageBackgroundUri && loadedStartPageBackgroundBitmap != null) {
-            binding.startPageBackgroundImage.setImageBitmap(loadedStartPageBackgroundBitmap)
-            binding.startPageBackgroundImage.visibility = View.VISIBLE
-            return
-        }
-
-        backgroundLoadJob?.cancel()
-        val uriToLoad = Uri.parse(backgroundUri)
-        val metrics = activity.resources.displayMetrics
-        val reqWidth = metrics.widthPixels.coerceAtLeast(1)
-        val reqHeight = metrics.heightPixels.coerceAtLeast(1)
-
-        backgroundLoadJob = activity.lifecycleScope.launch {
-            val bitmap = withContext(Dispatchers.IO) {
-                decodeSampledBitmapFromUri(uriToLoad, reqWidth, reqHeight)
-            }
-            
-            loadedStartPageBackgroundBitmap?.recycle()
-            loadedStartPageBackgroundBitmap = bitmap
-            loadedStartPageBackgroundUri = if (bitmap != null) backgroundUri else null
-
-            if (bitmap != null) {
-                binding.startPageBackgroundImage.setImageBitmap(bitmap)
-                binding.startPageBackgroundImage.visibility = View.VISIBLE
-            } else {
-                binding.startPageBackgroundImage.setImageBitmap(null)
-                binding.startPageBackgroundImage.visibility = View.GONE
-            }
-        }
-    }
-
-    private fun clearBackground() {
-        loadedStartPageBackgroundBitmap?.recycle()
-        loadedStartPageBackgroundBitmap = null
-        loadedStartPageBackgroundUri = null
-        binding.startPageBackgroundImage.setImageBitmap(null)
-        binding.startPageBackgroundImage.visibility = View.GONE
-    }
-
-    private fun applyDynamicStartPageGradientBackground() {
-        val baseSurface = callbacks.resolveThemeColor(com.google.android.material.R.attr.colorSurface)
-        val primaryContainer = callbacks.resolveThemeColor(com.google.android.material.R.attr.colorPrimaryContainer)
-        val secondaryContainer = callbacks.resolveThemeColor(com.google.android.material.R.attr.colorSecondaryContainer)
-        val tertiaryContainer = callbacks.resolveThemeColor(com.google.android.material.R.attr.colorTertiaryContainer)
-
-        val signature = baseSurface xor primaryContainer xor secondaryContainer xor tertiaryContainer
-        if (cachedStartPageGradientSignature == signature) {
-            return
-        }
-
-        val linearStart = ColorUtils.blendARGB(baseSurface, secondaryContainer, 0.30f)
-        val linearMid = ColorUtils.blendARGB(baseSurface, tertiaryContainer, 0.28f)
-        val linearEnd = ColorUtils.blendARGB(baseSurface, primaryContainer, 0.30f)
-
-        val baseLayer = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(linearStart, linearMid, linearEnd)).apply {
-            gradientType = GradientDrawable.LINEAR_GRADIENT
-        }
-
-        val density = activity.resources.displayMetrics.density
-        val blobs = arrayOf(
-            createBlob(primaryContainer, tertiaryContainer, 0.45f, 460f * density, 0.18f, 0.22f, 170),
-            createBlob(secondaryContainer, primaryContainer, 0.50f, 520f * density, 0.78f, 0.30f, 160),
-            createBlob(tertiaryContainer, secondaryContainer, 0.42f, 540f * density, 0.55f, 0.82f, 150)
-        )
-
-        binding.startPageRoot.background = LayerDrawable(arrayOf(baseLayer) + blobs)
-        cachedStartPageGradientSignature = signature
-    }
-
-    private fun createBlob(c1: Int, c2: Int, blend: Float, radius: Float, x: Float, y: Float, alpha: Int): GradientDrawable {
-        val color = ColorUtils.blendARGB(c1, c2, blend)
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            gradientType = GradientDrawable.RADIAL_GRADIENT
-            gradientRadius = radius
-            setGradientCenter(x, y)
-            colors = intArrayOf(ColorUtils.setAlphaComponent(color, alpha), Color.TRANSPARENT)
-        }
-    }
-
-    private fun decodeSampledBitmapFromUri(uri: Uri, reqWidth: Int, reqHeight: Int): Bitmap? {
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        runCatching {
-            activity.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-        }
-        if (options.outWidth <= 0 || options.outHeight <= 0) {
-            return null
-        }
-
-        options.inSampleSize = calculateInSampleSize(options.outWidth, options.outHeight, reqWidth, reqHeight)
-        options.inJustDecodeBounds = false
-        options.inPreferredConfig = Bitmap.Config.RGB_565
-
-        return runCatching {
-            activity.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
-        }.getOrNull()
-    }
-
-    private fun calculateInSampleSize(srcWidth: Int, srcHeight: Int, reqWidth: Int, reqHeight: Int): Int {
-        var inSampleSize = 1
-        if (srcHeight > reqHeight || srcWidth > reqWidth) {
-            val halfHeight = srcHeight / 2
-            val halfWidth = srcWidth / 2
-            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
-                inSampleSize *= 2
-            }
-        }
-        return inSampleSize
-    }
-
-    fun refreshStartPageQuickLinks() {
-        val slots = BrowserPreferences.getStartPageSlots(activity).map { url ->
-            val cleanUrl = url ?: ""
-            val hasIcon = if (cleanUrl.isNotEmpty()) SiteIconCache.getCachedIcon(activity, cleanUrl) != null else false
-            SlotItem(cleanUrl, hasIcon)
-        }
-        startPageAdapter.submitList(slots)
-    }
-
-    fun refreshStartPageResumeButton() {
-        binding.buttonStartPageResume.isVisible = !BrowserPreferences.getLastVisitedUrl(activity).isNullOrBlank()
+        backgroundRenderer.refreshStartPageBackground()
     }
 
     fun handleStartPageBackgroundPicked(uri: Uri?) {
-        if (uri == null) {
-            return
+        backgroundRenderer.handleStartPageBackgroundPicked(uri) {
+            refreshStartPage()
         }
-        if (activity.contentResolver.openInputStream(uri)?.use { true } != true) {
-            Toast.makeText(activity, R.string.start_page_background_error, Toast.LENGTH_SHORT).show()
-            return
-        }
-        runCatching { activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        val prev = BrowserPreferences.getStartPageBackgroundUri(activity)
-        BrowserPreferences.setStartPageBackgroundUri(activity, uri.toString())
-        if (!prev.isNullOrBlank() && prev != uri.toString()) {
-            runCatching { activity.contentResolver.releasePersistableUriPermission(Uri.parse(prev), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        }
-        refreshStartPage()
-        Toast.makeText(activity, R.string.start_page_background_set, Toast.LENGTH_SHORT).show()
     }
 
     fun clearStartPageBackground() {
-        val prev = BrowserPreferences.getStartPageBackgroundUri(activity)
-        if (prev == null) {
-            return
+        backgroundRenderer.clearStartPageBackground {
+            refreshStartPage()
         }
-        runCatching { activity.contentResolver.releasePersistableUriPermission(Uri.parse(prev), Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-        BrowserPreferences.clearStartPageBackgroundUri(activity)
-        refreshStartPage()
-        Toast.makeText(activity, R.string.start_page_background_cleared, Toast.LENGTH_SHORT).show()
     }
 }

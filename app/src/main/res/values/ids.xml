@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <item name="settings_filter_list_add_button" type="id" />
-    <item name="settings_filter_list_update_button" type="id" />
     <item name="webview_ubo_scriptlet_handler_tag" type="id" />
     <item name="webview_ubo_scriptlet_bridge_tag" type="id" />
     <item name="webview_cosmetic_handler_tag" type="id" />
@@ -10,6 +8,7 @@
     <item name="webview_pending_shields_url_tag" type="id" />
     <item name="webview_shields_enabled_tag" type="id" />
     <item name="webview_user_agent_profile_tag" type="id" />
+    <item name="webview_drm_l3_script_handler_tag" type="id" />
     <item name="settingsHeaderTitle" type="id" />
     <item name="buttonSettingsBack" type="id" />
     <item name="userAgentTitle" type="id" />

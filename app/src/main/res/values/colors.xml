@@ -26,16 +26,13 @@
     <color name="theme_outline_variant">#C3C7CF</color>
     <color name="theme_surface_container_lowest">#FFFFFFFF</color>
     <color name="theme_surface_container_low">#FFF1F4F8</color>
-    <color name="theme_surface_container">#FFEBEEF3</color>
+    <color name="theme_surface_container">#FFF0F4FA</color>
     <color name="theme_surface_container_high">#FFE5E8ED</color>
     <color name="theme_surface_container_highest">#FFDFE3E8</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="qr_code_background">#FFFFFFFF</color>
     <color name="menu_overlay_scrim">#80000000</color>
-    <color name="start_page_gradient_start">#17324A</color>
-    <color name="start_page_gradient_center">#1B5A66</color>
-    <color name="start_page_gradient_end">#D47C45</color>
     <color name="launcher_background_fill">#3DDC84</color>
     <color name="launcher_grid_stroke">#33FFFFFF</color>
 </resources>
