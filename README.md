@@ -152,6 +152,13 @@ I care about the app's growth, but I care about your privacy even more. This app
 
 ## <img src="https://github.com/kododake/AAAnything/blob/main/assets/icon.png?raw=true" width="32" height="32" valign="middle" alt="AA Anything Logo" /> Want More Than a Browser? Try **AA Anything**!
 
+<p align="center">
+  <a href="https://github.com/kododake/AAAnything">
+    <img src="https://raw.githubusercontent.com/kododake/AAAnything/refs/heads/main/assets/aaanything.png" alt="AA Anything in Action — Bring Your Favorite Apps to Android Auto" width="80%">
+  </a>
+</p>
+
+
 Love **AA Browser**, but wish you could also run your other favorite apps on your car's screen? Check out **[AA Anything](https://github.com/kododake/AAAnything)** — a brand-new tool I built to unlock your dashboard for everyday Android apps!
 
 - 🎬 **Bring Your Apps to the Dash:** Project media players (like **VLC** — completely free to use!), plus unlock third-party web browsers, finance trackers, and handy utilities directly on Android Auto *(excluding apps with strict DRM or Play Integrity restrictions)*.
