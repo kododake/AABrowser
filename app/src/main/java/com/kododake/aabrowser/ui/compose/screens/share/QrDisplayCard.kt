@@ -18,7 +18,6 @@
 package com.kododake.aabrowser.ui.compose.screens.share
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +42,6 @@ fun QrDisplayCard(
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
         shadowElevation = 0.dp,
         modifier = modifier.size(240.dp)
     ) {

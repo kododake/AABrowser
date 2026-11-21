@@ -133,15 +133,15 @@ class NavigationManager(
 
         val scheme = uri.scheme?.lowercase()
         val host = uri.host?.lowercase()
-        
+
         if (scheme == "http" && !BrowserPreferences.isHostAllowedCleartext(activity, host)) {
             permissionManager.showCleartextNavigationDialog(
                 uri = uri,
                 onAllowOnce = {
                     finishNavigation {
                         targetWebView.setTag(R.id.webview_allow_once_uri_tag, navigable)
-                        targetWebView.post { 
-                            targetWebView.loadUrl(navigable) 
+                        targetWebView.post {
+                            targetWebView.loadUrl(navigable)
                         }
                     }
                 },
@@ -151,8 +151,8 @@ class NavigationManager(
                     }
                     finishNavigation {
                         targetWebView.setTag(R.id.webview_allow_once_uri_tag, navigable)
-                        targetWebView.post { 
-                            targetWebView.loadUrl(navigable) 
+                        targetWebView.post {
+                            targetWebView.loadUrl(navigable)
                         }
                     }
                 },
@@ -165,8 +165,8 @@ class NavigationManager(
             return
         }
 
-        finishNavigation { 
-            targetWebView.loadUrl(navigable) 
+        finishNavigation {
+            targetWebView.loadUrl(navigable)
         }
     }
 }

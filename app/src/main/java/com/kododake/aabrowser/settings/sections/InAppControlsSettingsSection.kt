@@ -23,7 +23,6 @@ import android.widget.LinearLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
-import com.kododake.aabrowser.model.QuickActionButtonMode
 import com.kododake.aabrowser.model.QuickActionButtonPosition
 import com.kododake.aabrowser.settings.SettingsCallbacks
 import com.kododake.aabrowser.settings.components.SettingsComponentBuilder
@@ -47,35 +46,6 @@ object InAppControlsSettingsSection {
                 bottomPaddingDp = 8
             )
         )
-
-        val currentButtonMode = BrowserPreferences.getQuickActionButtonMode(context)
-        val buttonModeStatus = when (currentButtonMode) {
-            QuickActionButtonMode.MENU -> context.getString(R.string.settings_quick_action_button_mode_menu)
-            QuickActionButtonMode.ADDRESS_BAR -> context.getString(R.string.settings_quick_action_button_mode_address_bar)
-        }
-        val buttonModeRow = builder.createSettingRow(
-            title = context.getString(R.string.settings_quick_action_button_mode),
-            statusText = buttonModeStatus,
-            iconRes = R.drawable.settings_24px
-        ) {
-            val modes = arrayOf(
-                context.getString(R.string.settings_quick_action_button_mode_menu),
-                context.getString(R.string.settings_quick_action_button_mode_address_bar)
-            )
-            val selectedIndex = if (currentButtonMode == QuickActionButtonMode.ADDRESS_BAR) 1 else 0
-            MaterialAlertDialogBuilder(context, com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog)
-                .setTitle("Select Quick Action Mode")
-                .setSingleChoiceItems(modes, selectedIndex) { dialog, which ->
-                    dialog.dismiss()
-                    val newMode = if (which == 1) QuickActionButtonMode.ADDRESS_BAR else QuickActionButtonMode.MENU
-                    if (newMode != currentButtonMode) {
-                        BrowserPreferences.setQuickActionButtonMode(context, newMode)
-                        callbacks.onInAppControlsChanged()
-                    }
-                }
-                .show()
-        }
-        inner.addView(buttonModeRow)
 
         val alwaysVisibleRow = builder.createSettingSwitchRow(
             title = context.getString(R.string.settings_quick_action_button_always_visible),

@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,10 +36,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.kododake.aabrowser.ui.compose.components.ExpressiveBottomSheetContainer
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
 import com.kododake.aabrowser.ui.compose.components.rememberReorderableListState
 import com.kododake.aabrowser.ui.compose.components.reorderableList
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TabManagerSheet(
     isVisible: Boolean,
@@ -76,7 +78,7 @@ fun TabManagerSheet(
                 .heightIn(max = maxListHeight)
                 .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
                 .reorderableList(reorderState),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
         ) {
             item(key = "header") {
                 TabSheetHeader(
@@ -90,18 +92,12 @@ fun TabManagerSheet(
                 item(key = "empty") { TabEmptyView() }
             } else {
                 itemsIndexed(tabs, key = { _, item -> item.id }) { index, tab ->
-                    val position = when {
-                        tabs.size == 1 -> ListGroupPosition.Single
-                        index == 0 -> ListGroupPosition.Top
-                        index == tabs.lastIndex -> ListGroupPosition.Bottom
-                        else -> ListGroupPosition.Middle
-                    }
-
                     val isDragging = reorderState.draggedKey == tab.id
 
                     TabItemRow(
                         item = tab,
-                        position = position,
+                        index = index,
+                        count = tabs.size,
                         onSelect = { actions.onSelectTab(tab.id) },
                         onClose = { actions.onCloseTab(tab.id) },
                         favicon = faviconProvider(tab.url),

@@ -49,7 +49,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @Composable
 fun AddressBarComponent(
@@ -112,10 +111,7 @@ fun AddressBarComponent(
             )
 
             if (url.isNotEmpty()) {
-                IconButton(
-                    onClick = onClear,
-                    modifier = Modifier.bouncyClickable(onClick = onClear)
-                ) {
+                IconButton(onClick = onClear) {
                     Icon(
                         Icons.Rounded.Clear,
                         contentDescription = stringResource(R.string.menu_clear_address),
@@ -130,7 +126,6 @@ fun AddressBarComponent(
                 modifier = Modifier
                     .size(40.dp)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    .bouncyClickable(onClick = onGo)
             ) {
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowForward,

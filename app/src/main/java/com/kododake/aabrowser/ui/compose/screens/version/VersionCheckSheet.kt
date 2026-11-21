@@ -39,7 +39,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.ui.compose.components.ExpressiveBottomSheetContainer
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @Composable
 fun VersionCheckSheet(
@@ -96,7 +95,6 @@ fun VersionCheckSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp)
-                        .bouncyClickable { onOpenRelease(releaseUrl) }
                 ) {
                     Icon(
                         Icons.AutoMirrored.Rounded.OpenInNew,

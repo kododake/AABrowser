@@ -35,7 +35,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.ui.compose.components.ExpressiveSheetHeader
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @Composable
 fun TabSheetHeader(
@@ -55,8 +54,7 @@ fun TabSheetHeader(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
-                ),
-                modifier = Modifier.bouncyClickable(onClick = actions.onNewTab)
+                )
             ) {
                 Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))

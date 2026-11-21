@@ -25,13 +25,12 @@ import android.webkit.GeolocationPermissions
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Delete
@@ -40,6 +39,8 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LockReset
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -58,18 +59,20 @@ import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.model.UserAgentProfile
 import com.kododake.aabrowser.ui.compose.components.ExpressiveListItem
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
+import com.kododake.aabrowser.ui.compose.components.easterEggReleaseDetector
 import com.kododake.aabrowser.ui.compose.screens.dialogs.CustomUserAgentDialog
 import com.kododake.aabrowser.ui.compose.screens.dialogs.ExpressiveConfirmationDialog
 import com.kododake.aabrowser.ui.compose.screens.dialogs.ExpressiveSingleChoiceDialog
 import com.kododake.aabrowser.web.SslErrorHandlerHelper
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PrivacyAndAboutComposable(
     context: Context,
     onDrmL3EnforcerChanged: () -> Unit = {},
     onUserAgentChanged: () -> Unit = {},
+    onEasterEggHoldStart: () -> Unit = {},
+    onEasterEggHoldEnd: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var userAgent by remember { mutableStateOf(BrowserPreferences.getUserAgentProfile(context)) }
@@ -88,69 +91,73 @@ fun PrivacyAndAboutComposable(
             modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
         )
 
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_user_agent),
-            supportingText = stringResource(userAgent.titleRes),
-            leadingIcon = Icons.Rounded.Devices,
-            position = ListGroupPosition.Top,
-            onClick = { showUaDialog = true }
-        )
+        val isCustomUa = userAgent == UserAgentProfile.CUSTOM
+        val siteDataCount = if (isCustomUa) 5 else 4
+        var siteDataIndex = 0
 
-        if (userAgent == UserAgentProfile.CUSTOM) {
-            Spacer(Modifier.height(3.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
             ExpressiveListItem(
-                headline = stringResource(R.string.settings_user_agent_custom_hint),
-                supportingText = customUserAgent.ifBlank { stringResource(R.string.settings_user_agent_custom_empty_fallback) },
-                leadingIcon = Icons.Rounded.Edit,
-                position = ListGroupPosition.Middle,
-                onClick = { showCustomUaDialog = true }
+                headline = stringResource(R.string.settings_user_agent),
+                supportingText = stringResource(userAgent.titleRes),
+                leadingIcon = Icons.Rounded.Devices,
+                index = siteDataIndex++,
+                count = siteDataCount,
+                onClick = { showUaDialog = true }
+            )
+
+            if (isCustomUa) {
+                ExpressiveListItem(
+                    headline = stringResource(R.string.settings_user_agent_custom_hint),
+                    supportingText = customUserAgent.ifBlank { stringResource(R.string.settings_user_agent_custom_empty_fallback) },
+                    leadingIcon = Icons.Rounded.Edit,
+                    index = siteDataIndex++,
+                    count = siteDataCount,
+                    onClick = { showCustomUaDialog = true }
+                )
+            }
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_drm_l3_enforcer),
+                supportingText = stringResource(R.string.settings_drm_l3_enforcer_description),
+                leadingIcon = Icons.Rounded.Security,
+                index = siteDataIndex++,
+                count = siteDataCount,
+                trailingContent = {
+                    Switch(
+                        checked = drmL3Enabled,
+                        onCheckedChange = { checked ->
+                            drmL3Enabled = checked
+                            BrowserPreferences.setDrmL3EnforcerEnabled(context, checked)
+                            onDrmL3EnforcerChanged()
+                        }
+                    )
+                },
+                onClick = {
+                    val next = !drmL3Enabled
+                    drmL3Enabled = next
+                    BrowserPreferences.setDrmL3EnforcerEnabled(context, next)
+                    onDrmL3EnforcerChanged()
+                }
+            )
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_clear_site_permissions),
+                supportingText = stringResource(R.string.settings_clear_site_permissions_title),
+                leadingIcon = Icons.Rounded.LockReset,
+                index = siteDataIndex++,
+                count = siteDataCount,
+                onClick = { showClearPermissionsDialog = true }
+            )
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_clear_cookies),
+                supportingText = stringResource(R.string.settings_site_data_description),
+                leadingIcon = Icons.Rounded.Delete,
+                index = siteDataIndex,
+                count = siteDataCount,
+                onClick = { showClearCookiesDialog = true }
             )
         }
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_drm_l3_enforcer),
-            supportingText = stringResource(R.string.settings_drm_l3_enforcer_description),
-            leadingIcon = Icons.Rounded.Security,
-            position = ListGroupPosition.Middle,
-            trailingContent = {
-                Switch(
-                    checked = drmL3Enabled,
-                    onCheckedChange = { checked ->
-                        drmL3Enabled = checked
-                        BrowserPreferences.setDrmL3EnforcerEnabled(context, checked)
-                        onDrmL3EnforcerChanged()
-                    }
-                )
-            },
-            onClick = {
-                val next = !drmL3Enabled
-                drmL3Enabled = next
-                BrowserPreferences.setDrmL3EnforcerEnabled(context, next)
-                onDrmL3EnforcerChanged()
-            }
-        )
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_clear_site_permissions),
-            supportingText = stringResource(R.string.settings_clear_site_permissions_title),
-            leadingIcon = Icons.Rounded.LockReset,
-            position = ListGroupPosition.Middle,
-            onClick = { showClearPermissionsDialog = true }
-        )
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_clear_cookies),
-            supportingText = stringResource(R.string.settings_site_data_description),
-            leadingIcon = Icons.Rounded.Delete,
-            position = ListGroupPosition.Bottom,
-            onClick = { showClearCookiesDialog = true }
-        )
 
         Spacer(Modifier.height(24.dp))
 
@@ -161,50 +168,53 @@ fun PrivacyAndAboutComposable(
             modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
         )
 
-        ExpressiveListItem(
-            headline = stringResource(R.string.open_source_view_licenses),
-            supportingText = stringResource(R.string.open_source_licenses_title),
-            leadingIcon = Icons.Rounded.Code,
-            position = ListGroupPosition.Top,
-            onClick = {
-                try {
-                    val activityClass = Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")
-                    val intent = Intent(context, activityClass)
+        Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+            ExpressiveListItem(
+                headline = stringResource(R.string.open_source_view_licenses),
+                supportingText = stringResource(R.string.open_source_licenses_title),
+                leadingIcon = Icons.Rounded.Code,
+                index = 0,
+                count = 3,
+                onClick = {
+                    try {
+                        val activityClass = Class.forName("com.google.android.gms.oss.licenses.OssLicensesMenuActivity")
+                        val intent = Intent(context, activityClass)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        Toast.makeText(context, R.string.error_generic_message, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_license),
+                supportingText = stringResource(R.string.settings_license_description),
+                leadingIcon = Icons.Rounded.Info,
+                index = 1,
+                count = 3,
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.gnu.org/licenses/gpl-3.0.html"))
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(intent)
-                } catch (_: Exception) {
-                    Toast.makeText(context, R.string.error_generic_message, Toast.LENGTH_SHORT).show()
                 }
-            }
-        )
+            )
 
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_license),
-            supportingText = stringResource(R.string.settings_license_description),
-            leadingIcon = Icons.Rounded.Info,
-            position = ListGroupPosition.Middle,
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.gnu.org/licenses/gpl-3.0.html"))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            }
-        )
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.app_name),
-            supportingText = "v${BuildConfig.VERSION_NAME} • ${AppConstants.GITHUB_REPO_URL}",
-            leadingIcon = Icons.Rounded.Info,
-            position = ListGroupPosition.Bottom,
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppConstants.GITHUB_REPO_URL))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
-            }
-        )
+            ExpressiveListItem(
+                headline = stringResource(R.string.app_name),
+                supportingText = "v${BuildConfig.VERSION_NAME} • ${AppConstants.GITHUB_REPO_URL}",
+                leadingIcon = Icons.Rounded.Info,
+                index = 2,
+                count = 3,
+                modifier = Modifier.easterEggReleaseDetector(onEasterEggHoldEnd),
+                onLongClick = onEasterEggHoldStart,
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppConstants.GITHUB_REPO_URL))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                }
+            )
+        }
     }
 
     if (showUaDialog) {

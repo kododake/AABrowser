@@ -17,7 +17,6 @@
 
 package com.kododake.aabrowser.ui.compose.screens.startpage
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -42,7 +41,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.theme.ExpressiveTypography
 
 @Composable
@@ -90,20 +88,12 @@ private fun StartPageActionButton(
     val pillShape = RoundedCornerShape(24.dp)
 
     Surface(
+        onClick = onClick,
         shape = pillShape,
         color = containerColor,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-        ),
         shadowElevation = 0.dp,
-        modifier = modifier
-            .height(46.dp)
-            .bouncyClickable(
-                shape = pillShape,
-                onClick = onClick
-            )
+        modifier = modifier.height(46.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 18.dp),

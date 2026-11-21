@@ -17,13 +17,10 @@
 
 package com.kododake.aabrowser.ui.compose.screens.menu
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
@@ -39,25 +37,23 @@ import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tab
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
-import com.kododake.aabrowser.ui.compose.theme.ExpressiveMotion
 
 @Composable
 fun MenuQuickActionsGrid(
@@ -143,6 +139,7 @@ fun MenuQuickActionsGrid(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RowScope.M3EGridButton(
     icon: ImageVector,
@@ -154,35 +151,11 @@ private fun RowScope.M3EGridButton(
     bottomStart: Dp,
     enabled: Boolean = true
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val morphTopStart by animateDpAsState(
-        targetValue = if (isPressed) 20.dp else topStart,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "gridTopStart"
-    )
-    val morphTopEnd by animateDpAsState(
-        targetValue = if (isPressed) 20.dp else topEnd,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "gridTopEnd"
-    )
-    val morphBottomEnd by animateDpAsState(
-        targetValue = if (isPressed) 20.dp else bottomEnd,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "gridBottomEnd"
-    )
-    val morphBottomStart by animateDpAsState(
-        targetValue = if (isPressed) 20.dp else bottomStart,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "gridBottomStart"
-    )
-
-    val shape = RoundedCornerShape(
-        topStart = morphTopStart,
-        topEnd = morphTopEnd,
-        bottomEnd = morphBottomEnd,
-        bottomStart = morphBottomStart
+    val defaultShape = RoundedCornerShape(
+        topStart = topStart,
+        topEnd = topEnd,
+        bottomEnd = bottomEnd,
+        bottomStart = bottomStart
     )
 
     val isDark = isSystemInDarkTheme()
@@ -194,33 +167,30 @@ private fun RowScope.M3EGridButton(
     val contentAlpha = if (enabled) 1f else 0.38f
 
     FilledTonalButton(
-        onClick = { if (enabled) onClick() },
-        shape = shape,
-        interactionSource = interactionSource,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (enabled) 0.25f else 0.12f)
+        onClick = onClick,
+        enabled = enabled,
+        shapes = ButtonDefaults.shapes(
+            shape = defaultShape,
+            pressedShape = RoundedCornerShape(20.dp)
         ),
+        border = null,
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = containerColor,
-            contentColor = MaterialTheme.colorScheme.onSurface
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            disabledContainerColor = containerColor,
+            disabledContentColor = MaterialTheme.colorScheme.onSurface
         ),
         elevation = ButtonDefaults.filledTonalButtonElevation(
             defaultElevation = 0.dp,
             pressedElevation = 0.dp,
             focusedElevation = 0.dp,
-            hoveredElevation = 0.dp
+            hoveredElevation = 0.dp,
+            disabledElevation = 0.dp
         ),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
         modifier = Modifier
             .weight(1f)
             .height(72.dp)
-            .then(
-                if (enabled) Modifier.bouncyClickable(
-                    interactionSource = interactionSource,
-                    shape = shape,
-                    onClick = onClick
-                ) else Modifier
-            )
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -237,7 +207,16 @@ private fun RowScope.M3EGridButton(
                 text = label,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = contentAlpha),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                autoSize = TextAutoSize.StepBased(
+                    minFontSize = 9.5.sp,
+                    maxFontSize = 12.sp,
+                    stepSize = 0.5.sp
+                )
             )
         }
     }

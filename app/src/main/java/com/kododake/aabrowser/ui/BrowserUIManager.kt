@@ -94,7 +94,7 @@ class BrowserUIManager(
 
     fun applyQuickActionButtonPreferences() {
         val mode = BrowserPreferences.getQuickActionButtonMode(activity)
-        menuHelper.setFabMode(mode == QuickActionButtonMode.ADDRESS_BAR)
+        menuHelper.setFabMode(mode != QuickActionButtonMode.MENU)
         val density = activity.resources.displayMetrics.density
         val margin = (16 * density).toInt()
         val position = BrowserPreferences.getQuickActionButtonPosition(activity)

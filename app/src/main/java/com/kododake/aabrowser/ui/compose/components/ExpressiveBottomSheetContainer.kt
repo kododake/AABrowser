@@ -21,7 +21,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -191,10 +190,6 @@ fun ExpressiveBottomSheetContainer(
                     )
                     .background(surfaceBase, sheetShape)
                     .background(bgGradient, sheetShape)
-                    .border(
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.40f)),
-                        sheetShape
-                    )
                     .clip(sheetShape)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },

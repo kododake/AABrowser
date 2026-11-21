@@ -57,7 +57,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.ui.compose.components.LocalSheetDragModifier
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -78,10 +77,6 @@ fun MenuHeaderComponent(
         shape = headerShape,
         color = containerColor,
         shadowElevation = 0.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-        ),
         modifier = modifier
             .fillMaxWidth()
             .height(70.dp)
@@ -134,7 +129,7 @@ fun MenuHeaderComponent(
                         .width(56.dp)
                         .clip(closeShape)
                         .background(Color.Transparent)
-                        .bouncyClickable(shape = closeShape, onClick = onClose),
+                        .clickable(onClick = onClose),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

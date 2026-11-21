@@ -34,6 +34,8 @@ class PermissionManager(private val activity: AppCompatActivity) {
 
     var pendingPermissionRequest: PermissionRequest? = null
     var pendingSpeechBridgeTabId: Long? = null
+    private var pendingLocalNetworkCallback: ((Boolean, Boolean) -> Unit)? = null
+    private var localNetworkPermanentlyDenied: Boolean = false
     var pendingGeolocationOrigin: String?
         get() = geolocationHandler.pendingGeolocationOrigin
         set(value) { geolocationHandler.pendingGeolocationOrigin = value }
@@ -49,6 +51,28 @@ class PermissionManager(private val activity: AppCompatActivity) {
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
         ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), requestCode)
+    }
+
+    fun hasLocalNetworkPermission(): Boolean {
+        val granted = ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_LOCAL_NETWORK) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            localNetworkPermanentlyDenied = false
+        }
+        return granted
+    }
+
+    fun isLocalNetworkPermanentlyDenied(): Boolean {
+        return !hasLocalNetworkPermission() && localNetworkPermanentlyDenied
+    }
+
+    fun requestLocalNetworkPermission(requestCode: Int, onResult: (Boolean, Boolean) -> Unit) {
+        if (hasLocalNetworkPermission()) {
+            onResult(true, false)
+            return
+        }
+        pendingLocalNetworkCallback?.invoke(false, false)
+        pendingLocalNetworkCallback = onResult
+        ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.ACCESS_LOCAL_NETWORK), requestCode)
     }
 
     private fun grantableWebPermissionResources(request: PermissionRequest): Array<String> {
@@ -226,6 +250,14 @@ class PermissionManager(private val activity: AppCompatActivity) {
             pendingSpeechBridgeTabId = null
         } else if (requestCode == AppConstants.REQUEST_CODE_ACCESS_LOCATION) {
             geolocationHandler.handlePermissionResult()
+        } else if (requestCode == AppConstants.REQUEST_CODE_ACCESS_LOCAL_NETWORK) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            val permanentlyDenied = !granted &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_LOCAL_NETWORK)
+            localNetworkPermanentlyDenied = permanentlyDenied
+            val callback = pendingLocalNetworkCallback
+            pendingLocalNetworkCallback = null
+            callback?.invoke(granted, permanentlyDenied)
         }
     }
 }

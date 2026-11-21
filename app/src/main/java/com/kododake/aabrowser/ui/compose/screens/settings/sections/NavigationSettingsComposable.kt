@@ -18,10 +18,9 @@
 package com.kododake.aabrowser.ui.compose.screens.settings.sections
 
 import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +30,8 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Tab
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -47,7 +48,8 @@ import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.ui.compose.components.ExpressiveListItem
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 
 @Composable
 fun NavigationSettingsComposable(
@@ -73,59 +75,60 @@ fun NavigationSettingsComposable(
         } else {
             homePageUrl
         }
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_home_page),
-            supportingText = homeSub,
-            leadingIcon = Icons.Rounded.Home,
-            position = ListGroupPosition.Top,
-            onClick = { showHomePageDialog = true }
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_home_page),
+                supportingText = homeSub,
+                leadingIcon = Icons.Rounded.Home,
+                index = 0,
+                count = 3,
+                onClick = { showHomePageDialog = true }
+            )
 
-        Spacer(Modifier.height(3.dp))
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_restore_tabs_on_launch),
+                supportingText = stringResource(R.string.settings_restore_tabs_on_launch_description),
+                leadingIcon = Icons.Rounded.Tab,
+                index = 1,
+                count = 3,
+                trailingContent = {
+                    Switch(
+                        checked = restoreTabs,
+                        onCheckedChange = { checked ->
+                            restoreTabs = checked
+                            BrowserPreferences.setRestoreTabsOnLaunch(context, checked)
+                        }
+                    )
+                },
+                onClick = {
+                    val next = !restoreTabs
+                    restoreTabs = next
+                    BrowserPreferences.setRestoreTabsOnLaunch(context, next)
+                }
+            )
 
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_restore_tabs_on_launch),
-            supportingText = stringResource(R.string.settings_restore_tabs_on_launch_description),
-            leadingIcon = Icons.Rounded.Tab,
-            position = ListGroupPosition.Middle,
-            trailingContent = {
-                Switch(
-                    checked = restoreTabs,
-                    onCheckedChange = { checked ->
-                        restoreTabs = checked
-                        BrowserPreferences.setRestoreTabsOnLaunch(context, checked)
-                    }
-                )
-            },
-            onClick = {
-                val next = !restoreTabs
-                restoreTabs = next
-                BrowserPreferences.setRestoreTabsOnLaunch(context, next)
-            }
-        )
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_resume_last_page_on_launch),
-            supportingText = stringResource(R.string.settings_resume_last_page_on_launch_description),
-            leadingIcon = Icons.Rounded.History,
-            position = ListGroupPosition.Bottom,
-            trailingContent = {
-                Switch(
-                    checked = resumeLastPage,
-                    onCheckedChange = { checked ->
-                        resumeLastPage = checked
-                        BrowserPreferences.setResumeLastPageOnLaunch(context, checked)
-                    }
-                )
-            },
-            onClick = {
-                val next = !resumeLastPage
-                resumeLastPage = next
-                BrowserPreferences.setResumeLastPageOnLaunch(context, next)
-            }
-        )
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_resume_last_page_on_launch),
+                supportingText = stringResource(R.string.settings_resume_last_page_on_launch_description),
+                leadingIcon = Icons.Rounded.History,
+                index = 2,
+                count = 3,
+                trailingContent = {
+                    Switch(
+                        checked = resumeLastPage,
+                        onCheckedChange = { checked ->
+                            resumeLastPage = checked
+                            BrowserPreferences.setResumeLastPageOnLaunch(context, checked)
+                        }
+                    )
+                },
+                onClick = {
+                    val next = !resumeLastPage
+                    resumeLastPage = next
+                    BrowserPreferences.setResumeLastPageOnLaunch(context, next)
+                }
+            )
+        }
     }
 
     if (showHomePageDialog) {

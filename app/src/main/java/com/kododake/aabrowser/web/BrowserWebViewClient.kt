@@ -84,9 +84,48 @@ class BrowserWebViewClient(
         }
     }
 
+    private var lastRetriedLocalNetworkUrl: String? = null
+    private var lastRetriedLocalNetworkAtMs: Long = 0L
+
     override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+        val message = error.description?.toString().orEmpty()
+        if (com.kododake.aabrowser.util.LocalNetworkHelper.isLocalNetworkPermissionMissingError(message)) {
+            val code = error.errorCode
+            val failed = request.url?.toString().orEmpty()
+            val reloadUrl = if (request.isForMainFrame) failed else view.url.orEmpty()
+            val now = System.currentTimeMillis()
+            val onDenied: (Boolean) -> Unit = { permanentlyDenied ->
+                if (request.isForMainFrame) {
+                    val noticeParam = if (permanentlyDenied) {
+                        val hint = view.context.getString(com.kododake.aabrowser.R.string.local_network_permission_permanently_denied_hint)
+                        "&notice=${Uri.encode(hint)}"
+                    } else {
+                        ""
+                    }
+                    val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&code=$code&message=${Uri.encode(message)}$noticeParam"
+                    try {
+                        view.loadUrl(assetUrl)
+                    } catch (_: Exception) {
+                        callbacks.onError(code, error.description?.toString())
+                    }
+                }
+            }
+            val isRecentRetry = reloadUrl == lastRetriedLocalNetworkUrl && (now - lastRetriedLocalNetworkAtMs) < 1_500L
+            if (reloadUrl.isNotEmpty() && !isRecentRetry) {
+                lastRetriedLocalNetworkUrl = reloadUrl
+                lastRetriedLocalNetworkAtMs = now
+                callbacks.onLocalNetworkPermissionMissing(reloadUrl, onDenied)
+                return
+            }
+            if (request.isForMainFrame) {
+                onDenied(callbacks.isLocalNetworkPermanentlyDenied())
+                return
+            }
+        }
+
         if (request.isForMainFrame) {
             val code = error.errorCode
+            val failed = request.url?.toString().orEmpty()
             val shouldShowErrorPage = when (code) {
                 ERROR_HOST_LOOKUP,
                 ERROR_CONNECT,
@@ -97,8 +136,6 @@ class BrowserWebViewClient(
             }
 
             if (shouldShowErrorPage) {
-                val failed = request.url?.toString().orEmpty()
-                val message = error.description?.toString().orEmpty()
                 val assetUrl = "file:///android_asset/error.html?failedUrl=${Uri.encode(failed)}&code=$code&message=${Uri.encode(message)}"
                 try {
                     view.loadUrl(assetUrl)

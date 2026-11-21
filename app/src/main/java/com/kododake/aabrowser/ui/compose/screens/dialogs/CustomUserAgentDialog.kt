@@ -18,7 +18,6 @@
 package com.kododake.aabrowser.ui.compose.screens.dialogs
 
 import android.content.res.Configuration
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -78,10 +77,6 @@ fun CustomUserAgentDialog(
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-            ),
             shadowElevation = 0.dp,
             modifier = modifier
                 .fillMaxWidth()

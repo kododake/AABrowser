@@ -14,6 +14,7 @@
     button { background:#1f6feb; color:#fff; border:none; padding:10px 14px; border-radius:6px; cursor:pointer; }
     button.secondary { background:#e0e0e0; color:#111; }
     .small { font-size:13px; color:#666; }
+    .notice { margin:12px 0; padding:12px 14px; border-radius:6px; background:#eef4ff; color:#173b6c; font-size:14px; line-height:1.45; }
   </style>
 </head>
 <body>
@@ -45,6 +46,15 @@
     const httpStatus = getParam('httpStatus') || ''
     const code = getParam('code') || httpStatus || ''
     const message = decodeURIComponent(getParam('message') || '')
+    const notice = decodeURIComponent(getParam('notice') || '')
+
+    if (notice) {
+      const box = document.createElement('div')
+      box.className = 'notice'
+      box.textContent = notice
+      const actions = document.querySelector('.actions')
+      actions.parentNode.insertBefore(box, actions)
+    }
 
     if (code || message) {
       const info = document.createElement('p')

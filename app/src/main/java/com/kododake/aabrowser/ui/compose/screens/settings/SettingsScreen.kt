@@ -21,6 +21,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,8 +38,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -47,9 +51,9 @@ import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.settings.SettingsActivity
 import com.kododake.aabrowser.settings.SettingsCallbacks
+import com.kododake.aabrowser.ui.compose.components.EasterEggIconDropOverlay
 import com.kododake.aabrowser.ui.compose.components.ExpressiveDragHandle
 import com.kododake.aabrowser.ui.compose.components.ExpressiveSheetHeader
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.screens.settings.sections.AppearanceSettingsComposable
 import com.kododake.aabrowser.ui.compose.screens.settings.sections.DisplayScaleSettingsComposable
 import com.kododake.aabrowser.ui.compose.screens.settings.sections.InAppControlsComposable
@@ -104,10 +108,14 @@ fun SettingsScreen(
             surfaceModifier
         }
 
-        Column(
-            modifier = contentModifier,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        var isEasterEggHolding by remember { mutableStateOf(false) }
+        var showEasterEgg by remember { mutableStateOf(false) }
+
+        Box(modifier = contentModifier) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             if (includeDragHandle) {
                 ExpressiveDragHandle(modifier = dragHandleModifier)
             }
@@ -138,13 +146,7 @@ fun SettingsScreen(
                                         context.startActivity(Intent(context, SettingsActivity::class.java))
                                     } catch (_: Exception) {}
                                 },
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .bouncyClickable {
-                                        try {
-                                            context.startActivity(Intent(context, SettingsActivity::class.java))
-                                        } catch (_: Exception) {}
-                                    }
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.OpenInNew,
@@ -200,13 +202,27 @@ fun SettingsScreen(
                     PrivacyAndAboutComposable(
                         context = context,
                         onDrmL3EnforcerChanged = callbacks.onDrmL3EnforcerChanged,
-                        onUserAgentChanged = callbacks.onUserAgentChanged
+                        onUserAgentChanged = callbacks.onUserAgentChanged,
+                        onEasterEggHoldStart = {
+                            isEasterEggHolding = true
+                            showEasterEgg = true
+                        },
+                        onEasterEggHoldEnd = {
+                            isEasterEggHolding = false
+                        }
                     )
 
                     Spacer(Modifier.height(32.dp))
                 }
             }
+            if (showEasterEgg) {
+                EasterEggIconDropOverlay(
+                    isHolding = isEasterEggHolding,
+                    onFinished = { showEasterEgg = false }
+                )
+            }
         }
+    }
     }
 
     if (applyTheme) {

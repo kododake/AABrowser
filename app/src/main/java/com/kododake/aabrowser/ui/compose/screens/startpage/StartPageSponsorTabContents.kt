@@ -18,7 +18,6 @@
 package com.kododake.aabrowser.ui.compose.screens.startpage
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,7 +48,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.theme.ExpressiveTypography
 
 @Composable
@@ -102,17 +100,13 @@ internal fun BmcTabContent(
                 Spacer(Modifier.height(10.dp))
 
                 Surface(
+                    onClick = { onOpenUrl("https://buymeacoffee.com/kododake") },
                     shape = buttonShape,
                     shadowElevation = 0.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
                     color = Color.White,
                     modifier = Modifier
                         .height(44.dp)
                         .width(156.dp)
-                        .bouncyClickable(
-                            shape = buttonShape,
-                            onClick = { onOpenUrl("https://buymeacoffee.com/kododake") }
-                        )
                 ) {
                     Image(
                         painter = painterResource(R.drawable.white_button),
@@ -178,17 +172,12 @@ internal fun GithubTabContent(
                 Spacer(Modifier.height(10.dp))
 
                 Surface(
+                    onClick = { onOpenUrl("https://github.com/sponsors/kododake") },
                     shape = buttonShape,
                     shadowElevation = 0.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .height(44.dp)
-                        .bouncyClickable(
-                            shape = buttonShape,
-                            onClick = { onOpenUrl("https://github.com/sponsors/kododake") }
-                        )
+                    modifier = Modifier.height(44.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -221,7 +210,6 @@ private fun SponsorQrCard(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
         shadowElevation = 0.dp,
         modifier = modifier.size(104.dp)
     ) {

@@ -22,8 +22,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -97,10 +97,6 @@ fun SearchBarComponent(
         shape = addressShape,
         color = containerColor,
         shadowElevation = 0.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-        ),
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
@@ -175,9 +171,7 @@ fun SearchBarComponent(
             ) {
                 IconButton(
                     onClick = { queryText = "" },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .bouncyClickable { queryText = "" }
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         Icons.Rounded.Clear,
@@ -195,7 +189,7 @@ fun SearchBarComponent(
                     .size(40.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.primary)
-                    .bouncyClickable(shape = CircleShape) {
+                    .clickable {
                         if (queryText.isNotBlank()) onNavigate(queryText)
                     },
                 contentAlignment = Alignment.Center

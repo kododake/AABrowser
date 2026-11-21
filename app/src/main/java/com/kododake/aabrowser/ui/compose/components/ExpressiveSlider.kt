@@ -17,31 +17,19 @@
 
 package com.kododake.aabrowser.ui.compose.components
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.unit.dp
-import androidx.compose.material3.SliderState
-import com.kododake.aabrowser.ui.compose.theme.ExpressiveMotion
+import kotlin.math.abs
 
-/**
- * Material 3 Expressive thick track (16dp) slider with elastic vertical handle (4x44dp).
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpressiveSlider(
@@ -53,21 +41,11 @@ fun ExpressiveSlider(
     steps: Int = 0
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isDragging by interactionSource.collectIsDraggedAsState()
-
-    val handleWidth by animateDpAsState(
-        targetValue = if (isDragging) 8.dp else 4.dp,
-        animationSpec = ExpressiveMotion.DpBouncySpring,
-        label = "handleWidth"
+    val colors = SliderDefaults.colors(
+        thumbColor = MaterialTheme.colorScheme.primary,
+        activeTrackColor = MaterialTheme.colorScheme.primary,
+        inactiveTrackColor = MaterialTheme.colorScheme.secondaryContainer
     )
-    val handleHeight by animateDpAsState(
-        targetValue = if (isDragging) 48.dp else 44.dp,
-        animationSpec = ExpressiveMotion.DpBouncySpring,
-        label = "handleHeight"
-    )
-
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryContainerColor = MaterialTheme.colorScheme.secondaryContainer
 
     val sliderState = remember(steps, valueRange) {
         SliderState(
@@ -76,42 +54,30 @@ fun ExpressiveSlider(
             trackRange = valueRange
         )
     }
-    sliderState.value = value
+    LaunchedEffect(value) {
+        if (abs(sliderState.value - value) >= 0.5f) {
+            sliderState.value = value
+        }
+    }
 
     Slider(
         state = sliderState,
         onValueChange = onValueChange,
         onValueChangeFinished = onValueChangeFinished,
         interactionSource = interactionSource,
+        colors = colors,
         modifier = modifier.fillMaxWidth(),
         thumb = {
-            Box(
-                modifier = Modifier
-                    .size(width = handleWidth, height = handleHeight)
-                    .background(primaryColor, RoundedCornerShape(2.dp))
+            SliderDefaults.Thumb(
+                interactionSource = interactionSource,
+                colors = colors
             )
         },
-        track = {
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(16.dp)
-            ) {
-                val fraction = if (valueRange.endInclusive > valueRange.start) {
-                    ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-                } else 0f
-
-                val corner = CornerRadius(8.dp.toPx())
-                drawRoundRect(
-                    color = secondaryContainerColor,
-                    cornerRadius = corner
-                )
-                drawRoundRect(
-                    color = primaryColor,
-                    size = size.copy(width = size.width * fraction),
-                    cornerRadius = corner
-                )
-            }
+        track = { state ->
+            SliderDefaults.Track(
+                sliderState = state,
+                colors = colors
+            )
         }
     )
 }

@@ -37,7 +37,6 @@ import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.model.AppThemeMode
 import com.kododake.aabrowser.ui.compose.components.ExpressiveListItem
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
 import com.kododake.aabrowser.ui.compose.screens.dialogs.ExpressiveSingleChoiceDialog
 
 @Composable
@@ -66,7 +65,8 @@ fun AppearanceSettingsComposable(
             headline = stringResource(R.string.settings_appearance),
             supportingText = themeSubtitle,
             leadingIcon = Icons.Rounded.Palette,
-            position = ListGroupPosition.Single,
+            index = 0,
+            count = 1,
             onClick = { showThemeDialog = true }
         )
     }

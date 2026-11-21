@@ -21,6 +21,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import com.kododake.aabrowser.AppConstants.REQUEST_CODE_ACCESS_LOCAL_NETWORK
 import com.kododake.aabrowser.AppConstants.REQUEST_CODE_RECORD_AUDIO
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
@@ -116,6 +117,24 @@ class WebBrowserCallbackFactory(
                         ).show()
                     }
                 }
+            },
+            onLocalNetworkPermissionMissing = { failedUrl, onDenied ->
+                activity.runOnUiThread {
+                    if (!provider.permissionManager.hasLocalNetworkPermission()) {
+                        provider.permissionManager.requestLocalNetworkPermission(REQUEST_CODE_ACCESS_LOCAL_NETWORK) { granted, permanentlyDenied ->
+                            if (granted) {
+                                tab.webView.loadUrl(failedUrl)
+                            } else {
+                                onDenied(permanentlyDenied)
+                            }
+                        }
+                    } else {
+                        onDenied(provider.permissionManager.isLocalNetworkPermanentlyDenied())
+                    }
+                }
+            },
+            isLocalNetworkPermanentlyDenied = {
+                provider.permissionManager.isLocalNetworkPermanentlyDenied()
             },
             onEnterFullscreen = { v, c ->
                 activity.runOnUiThread {

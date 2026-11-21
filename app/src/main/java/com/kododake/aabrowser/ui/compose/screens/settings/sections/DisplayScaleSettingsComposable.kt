@@ -18,7 +18,6 @@
 package com.kododake.aabrowser.ui.compose.screens.settings.sections
 
 import android.content.Context
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -75,7 +74,6 @@ fun DisplayScaleSettingsComposable(
         Surface(
             shape = RoundedCornerShape(28.dp),
             color = cardColor,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
             shadowElevation = 0.dp,
             modifier = Modifier.fillMaxWidth()
         ) {

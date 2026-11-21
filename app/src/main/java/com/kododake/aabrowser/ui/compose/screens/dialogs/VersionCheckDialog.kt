@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.BuildConfig
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.ui.compose.components.ExpressiveLoadingIndicator
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.theme.ExpressiveTypography
 
 @Composable
@@ -132,8 +131,7 @@ fun VersionCheckDialog(
             if (!isChecking && !isUpToDate && !releaseUrl.isNullOrBlank()) {
                 Button(
                     onClick = { onOpenRelease(releaseUrl) },
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.bouncyClickable { onOpenRelease(releaseUrl) }
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
@@ -143,8 +141,7 @@ fun VersionCheckDialog(
         },
         dismissButton = {
             TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.bouncyClickable(onClick = onDismiss)
+                onClick = onDismiss
             ) {
                 Text(stringResource(R.string.menu_close))
             }

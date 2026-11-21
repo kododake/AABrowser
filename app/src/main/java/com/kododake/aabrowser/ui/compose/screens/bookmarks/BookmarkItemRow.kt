@@ -38,8 +38,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,13 +52,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BookmarkItemRow(
     item: BookmarkItemUi,
-    position: ListGroupPosition,
+    index: Int,
+    count: Int,
     onSelect: () -> Unit,
     onPin: () -> Unit,
     onDelete: () -> Unit,
@@ -70,12 +72,7 @@ fun BookmarkItemRow(
     } else if (isAnyItemDragging) {
         RoundedCornerShape(16.dp)
     } else {
-        when (position) {
-            ListGroupPosition.Single -> RoundedCornerShape(28.dp)
-            ListGroupPosition.Top -> RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp, bottomStart = 8.dp, bottomEnd = 8.dp)
-            ListGroupPosition.Middle -> RoundedCornerShape(8.dp)
-            ListGroupPosition.Bottom -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 28.dp, bottomEnd = 28.dp)
-        }
+        ListItemDefaults.segmentedShapes(index = index, count = count).shape
     }
 
     val isDark = isSystemInDarkTheme()
@@ -87,24 +84,16 @@ fun BookmarkItemRow(
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
-    val borderColor = if (isDragging) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-    }
-
     Surface(
+        onClick = onSelect,
+        enabled = !isAnyItemDragging,
         shape = itemShape,
         color = containerColor,
-        border = BorderStroke(if (isDragging) 1.5.dp else 1.dp, borderColor),
+        border = if (isDragging) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
         shadowElevation = if (isDragging) 8.dp else 0.dp,
         modifier = modifier
             .fillMaxWidth()
             .height(72.dp)
-            .bouncyClickable(
-                enabled = !isAnyItemDragging,
-                onClick = onSelect
-            )
     ) {
         Row(
             modifier = Modifier

@@ -17,38 +17,42 @@
 
 package com.kododake.aabrowser.ui.compose.screens.menu
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ButtonShapes
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
-import com.kododake.aabrowser.ui.compose.theme.ExpressiveMotion
 
+private data class NavActionSpec(
+    val icon: ImageVector,
+    val description: String,
+    val enabled: Boolean,
+    val onClick: () -> Unit
+)
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MenuNavigationRow(
     canGoBack: Boolean,
@@ -59,83 +63,10 @@ fun MenuNavigationRow(
     onReload: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        MenuNavigationButton(
-            icon = Icons.AutoMirrored.Rounded.ArrowBack,
-            description = stringResource(R.string.menu_back),
-            enabled = canGoBack,
-            onClick = onBack,
-            topStart = 24.dp,
-            topEnd = 8.dp,
-            bottomEnd = 8.dp,
-            bottomStart = 24.dp
-        )
-        MenuNavigationButton(
-            icon = Icons.AutoMirrored.Rounded.ArrowForward,
-            description = stringResource(R.string.menu_forward),
-            enabled = canGoForward,
-            onClick = onForward,
-            topStart = 8.dp,
-            topEnd = 8.dp,
-            bottomEnd = 8.dp,
-            bottomStart = 8.dp
-        )
-        MenuNavigationButton(
-            icon = Icons.Rounded.Refresh,
-            description = stringResource(R.string.menu_reload),
-            enabled = canReload,
-            onClick = onReload,
-            topStart = 8.dp,
-            topEnd = 24.dp,
-            bottomEnd = 24.dp,
-            bottomStart = 8.dp
-        )
-    }
-}
-
-@Composable
-private fun RowScope.MenuNavigationButton(
-    icon: ImageVector,
-    description: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    topStart: Dp,
-    topEnd: Dp,
-    bottomEnd: Dp,
-    bottomStart: Dp
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-
-    val morphTopStart by animateDpAsState(
-        targetValue = if (isPressed && enabled) 20.dp else topStart,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "navTopStart"
-    )
-    val morphTopEnd by animateDpAsState(
-        targetValue = if (isPressed && enabled) 20.dp else topEnd,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "navTopEnd"
-    )
-    val morphBottomEnd by animateDpAsState(
-        targetValue = if (isPressed && enabled) 20.dp else bottomEnd,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "navBottomEnd"
-    )
-    val morphBottomStart by animateDpAsState(
-        targetValue = if (isPressed && enabled) 20.dp else bottomStart,
-        animationSpec = ExpressiveMotion.CornerMorphSpring,
-        label = "navBottomStart"
-    )
-
-    val shape = RoundedCornerShape(
-        topStart = morphTopStart,
-        topEnd = morphTopEnd,
-        bottomEnd = morphBottomEnd,
-        bottomStart = morphBottomStart
+    val actions = listOf(
+        NavActionSpec(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.menu_back), canGoBack, onBack),
+        NavActionSpec(Icons.AutoMirrored.Rounded.ArrowForward, stringResource(R.string.menu_forward), canGoForward, onForward),
+        NavActionSpec(Icons.Rounded.Refresh, stringResource(R.string.menu_reload), canReload, onReload)
     )
 
     val isDark = isSystemInDarkTheme()
@@ -145,35 +76,65 @@ private fun RowScope.MenuNavigationButton(
         MaterialTheme.colorScheme.surfaceContainerLowest
     }
 
-    FilledTonalButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = shape,
-        interactionSource = interactionSource,
-        border = null,
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = containerColor,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            disabledContainerColor = containerColor.copy(alpha = 0.5f),
-            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        ),
-        elevation = ButtonDefaults.filledTonalButtonElevation(
-            defaultElevation = 0.dp,
-            pressedElevation = 0.dp,
-            focusedElevation = 0.dp,
-            hoveredElevation = 0.dp,
-            disabledElevation = 0.dp
-        ),
-        modifier = Modifier
-            .weight(1f)
-            .height(64.dp)
-            .bouncyClickable(
-                interactionSource = interactionSource,
-                enabled = enabled,
-                shape = shape,
-                onClick = onClick
-            )
+    ButtonGroup(
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        modifier = modifier.fillMaxWidth()
     ) {
-        Icon(icon, contentDescription = description, modifier = Modifier.size(24.dp))
+        actions.forEachIndexed { index, spec ->
+            customItem(
+                buttonGroupContent = {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val groupShapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        actions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    }
+                    val shapes: ButtonShapes = ButtonDefaults.shapes(
+                        shape = groupShapes.shape,
+                        pressedShape = groupShapes.pressedShape
+                    )
+                    FilledTonalButton(
+                        onClick = spec.onClick,
+                        enabled = spec.enabled,
+                        shapes = shapes,
+                        interactionSource = interactionSource,
+                        border = null,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = containerColor,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            disabledContainerColor = containerColor.copy(alpha = 0.5f),
+                            disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        ),
+                        elevation = ButtonDefaults.filledTonalButtonElevation(
+                            defaultElevation = 0.dp,
+                            pressedElevation = 0.dp,
+                            focusedElevation = 0.dp,
+                            hoveredElevation = 0.dp,
+                            disabledElevation = 0.dp
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(64.dp)
+                            .animateWidth(interactionSource)
+                    ) {
+                        Icon(spec.icon, contentDescription = spec.description, modifier = Modifier.size(24.dp))
+                    }
+                },
+                menuContent = { state ->
+                    DropdownMenuItem(
+                        text = { Text(spec.description) },
+                        leadingIcon = { Icon(spec.icon, contentDescription = null) },
+                        enabled = spec.enabled,
+                        onClick = {
+                            state.dismiss()
+                            spec.onClick()
+                        }
+                    )
+                }
+            )
+        }
     }
 }

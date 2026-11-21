@@ -114,18 +114,6 @@ fun StartPageSlotCard(
         label = "slotCardColor"
     )
 
-    val borderColor by animateColorAsState(
-        targetValue = if (isDragging) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
-        } else if (isEmpty) {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.10f)
-        } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-        },
-        animationSpec = tween(150),
-        label = "slotBorderColor"
-    )
-
     Box(
         modifier = modifier
             .zIndex(if (isDragging) 10f else 0f)
@@ -145,10 +133,16 @@ fun StartPageSlotCard(
                 spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
             )
             .background(cardColor, cornerShape)
-            .border(
-                width = 1.dp,
-                color = borderColor,
-                shape = cornerShape
+            .then(
+                if (isDragging) {
+                    Modifier.border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.50f),
+                        shape = cornerShape
+                    )
+                } else {
+                    Modifier
+                }
             )
             .clip(cornerShape)
             .pointerInput(Unit) {

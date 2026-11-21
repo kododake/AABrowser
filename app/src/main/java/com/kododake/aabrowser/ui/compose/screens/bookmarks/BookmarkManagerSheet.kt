@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -34,10 +36,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.kododake.aabrowser.ui.compose.components.ExpressiveBottomSheetContainer
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
 import com.kododake.aabrowser.ui.compose.components.rememberReorderableListState
 import com.kododake.aabrowser.ui.compose.components.reorderableList
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BookmarkManagerSheet(
     isVisible: Boolean,
@@ -78,7 +80,7 @@ fun BookmarkManagerSheet(
                 .heightIn(max = maxListHeight)
                 .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
                 .reorderableList(reorderState),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)
         ) {
             item(key = "header") {
                 BookmarkSheetHeader(
@@ -93,18 +95,12 @@ fun BookmarkManagerSheet(
                 item(key = "empty") { BookmarkEmptyView() }
             } else {
                 itemsIndexed(bookmarks, key = { _, item -> item.url }) { index, item ->
-                    val position = when {
-                        bookmarks.size == 1 -> ListGroupPosition.Single
-                        index == 0 -> ListGroupPosition.Top
-                        index == bookmarks.lastIndex -> ListGroupPosition.Bottom
-                        else -> ListGroupPosition.Middle
-                    }
-
                     val isDragging = reorderState.draggedKey == item.url
 
                     BookmarkItemRow(
                         item = item,
-                        position = position,
+                        index = index,
+                        count = bookmarks.size,
                         onSelect = { actions.onSelectBookmark(item.url) },
                         onPin = { actions.onPinBookmark(item.url, item.slotIndex) },
                         onDelete = { actions.onDeleteBookmark(item.url) },

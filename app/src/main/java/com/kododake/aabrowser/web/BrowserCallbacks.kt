@@ -30,6 +30,8 @@ data class BrowserCallbacks(
     val onProgressChange: (Int) -> Unit = {},
     val onShowDownloadPrompt: (Uri) -> Unit = {},
     val onError: (Int, String?) -> Unit = { _, _ -> },
+    val onLocalNetworkPermissionMissing: (String, (Boolean) -> Unit) -> Unit = { _, onDenied -> onDenied(false) },
+    val isLocalNetworkPermanentlyDenied: () -> Boolean = { false },
     val onCleartextNavigationRequested: (
         Uri,
         allowOnce: () -> Unit,

@@ -20,7 +20,6 @@ package com.kododake.aabrowser.ui.compose.screens.startpage
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -75,17 +74,10 @@ fun SiteIconBadge(
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
     }
 
-    val borderStrokeColor = if (isEmpty) {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f)
-    }
-
     Box(
         modifier = modifier
             .size(48.dp)
             .background(bg, badgeShape)
-            .border(1.dp, borderStrokeColor, badgeShape)
             .clip(badgeShape),
         contentAlignment = Alignment.Center
     ) {

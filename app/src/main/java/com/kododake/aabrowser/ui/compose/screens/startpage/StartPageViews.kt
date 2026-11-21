@@ -34,6 +34,7 @@ object StartPageViews {
         customBackgroundBitmapState: State<Bitmap?>? = null,
         customBackgroundBitmapProvider: () -> Bitmap? = { null },
         isNavigatingState: State<Boolean>? = null,
+        showAAAnythingBannerState: State<Boolean>? = null,
         callbacks: StartPageScreenCallbacks = StartPageScreenCallbacks()
     ): View {
         return ComposeView(context).apply {
@@ -41,6 +42,7 @@ object StartPageViews {
             setContent {
                 val isNavigating = isNavigatingState?.value ?: false
                 val customBackgroundBitmap = customBackgroundBitmapState?.value ?: customBackgroundBitmapProvider()
+                val showAAAnythingBanner = showAAAnythingBannerState?.value ?: false
                 StartPageScreen(
                     context = context,
                     slots = slots,
@@ -48,6 +50,7 @@ object StartPageViews {
                     sponsorsQrBitmap = sponsorsQrBitmap,
                     customBackgroundBitmap = customBackgroundBitmap,
                     isNavigating = isNavigating,
+                    showAAAnythingBanner = showAAAnythingBanner,
                     callbacks = callbacks
                 )
             }

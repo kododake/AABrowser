@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">AABrowser</string>
+    <string name="app_name" translatable="false">AABrowser</string>
     <string name="app_credit">AABrowser — by Kododake</string>
-    <string name="author_name">Kododake</string>
-    <string name="menu_title">AABrowser</string>
+    <string name="author_name" translatable="false">Kododake</string>
+    <string name="menu_title" translatable="false">AABrowser</string>
     <string name="menu_close">Close</string>
     <string name="menu_address_label">Address or search</string>
     
@@ -148,14 +148,14 @@
     <string name="settings_clear_cookies_success_title">Cookies and site data deleted</string>
     <string name="settings_clear_cookies_success_message">Stored cookies, local site data, and saved form data have been deleted from the browser.</string>
     
-    <string name="start_page_buy_me_a_coffee">Buy Me a Coffee</string>
-    <string name="start_page_bmc_tab">Buy Me a Coffee</string>
-    <string name="start_page_github_tab">GitHub Sponsors</string>
+    <string name="start_page_buy_me_a_coffee" translatable="false">Buy Me a Coffee</string>
+    <string name="start_page_bmc_tab" translatable="false">Buy Me a Coffee</string>
+    <string name="start_page_github_tab" translatable="false">GitHub Sponsors</string>
     <string name="start_page_bmc_description">If AABrowser made your day better, treating me to a coffee would seriously make my whole day! It keeps my code sharp and the updates rolling. ☕✨</string>
-    <string name="start_page_bmc_url">https://buymeacoffee.com/kododake</string>
+    <string name="start_page_bmc_url" translatable="false">https://buymeacoffee.com/kododake</string>
     <string name="settings_sponsors">Sponsors</string>
     <string name="settings_sponsors_description">Your support means the absolute world to me! Sponsoring directly powers new features and keeps AABrowser fast, independent, and free for everyone. 🚀</string>
-    <string name="settings_sponsors_tab_github">GitHub Sponsors</string>
+    <string name="settings_sponsors_tab_github" translatable="false">GitHub Sponsors</string>
     <string name="settings_sponsors_open_github_sponsors">Open Sponsors Page</string>
 
     
@@ -165,12 +165,12 @@
     <string name="open_source_view_licenses">View open-source licenses</string>
     <string name="open_source_licenses_title">Open-source Licenses</string>
     
-    <string name="kododake_name">kododake (Lead)</string>
+    <string name="kododake_name" translatable="false">kododake (Lead)</string>
     <string name="menu_start_page">Start Page</string>
     <string name="menu_start_page_add_current">Add current page to start page</string>
     <string name="menu_home_page_set_current">Set current page as home page</string>
     <string name="start_page_title">Start Page</string>
-    <string name="start_page_headline">AABrowser</string>
+    <string name="start_page_headline" translatable="false">AABrowser</string>
     <string name="start_page_subtitle">Quick access for the sites you use most.</string>
     <string name="start_page_card_title">Quick Links</string>
     <string name="start_page_quick_links_hint">Press and hold a tile to drag and reorder. Tap to open or configure.</string>
@@ -225,12 +225,13 @@
     <string name="start_page_slot_unassigned">Slot %1$d (Unassigned)</string>
     <string name="start_page_slot_empty_action">Tap to assign a bookmark</string>
     <string name="settings_open_fullscreen">Open in full screen</string>
-    <string name="aa_anything_promo_headline">Bring Your Favorite Apps to Android Auto 🚗✨</string>
-    <string name="aa_anything_promo_body">Don\'t limit your dashboard. Watch media, browse freely, and run your daily apps on the big screen with AA Anything.</string>
-    <string name="aa_anything_promo_button">Get AA Anything</string>
-    <string name="aa_anything_promo_dismiss">Dismiss announcement</string>
+    <string name="aa_anything_promo_headline">Run VLC, Firefox &amp; Any App in Your Car 🚗✨</string>
+    <string name="aa_anything_promo_body">Watch phone videos with VLC, block ads using Firefox, and run your daily apps on Android Auto with AA Anything. Free download!</string>
+    <string name="aa_anything_promo_button">Free Download (Phone)</string>
+    <string name="aa_anything_promo_opened_toast">Opening AA Anything download page on your phone…</string>
     <string name="settings_start_page_show_aa_anything">Show AA Anything banner</string>
     <string name="settings_start_page_show_aa_anything_desc">Display introduction card on start page</string>
     <string name="settings_start_page_about_aa_anything">About AA Anything</string>
     <string name="settings_start_page_about_aa_anything_desc">Open latest release on phone</string>
+    <string name="local_network_permission_permanently_denied_hint">Local network access is blocked. Please allow Nearby devices permission in Android Settings &gt; Apps &gt; AABrowser &gt; Permissions.</string>
 </resources>

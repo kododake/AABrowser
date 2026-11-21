@@ -35,7 +35,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.ui.compose.components.ExpressiveSheetHeader
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @Composable
 fun BookmarkSheetHeader(
@@ -59,8 +58,7 @@ fun BookmarkSheetHeader(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                     disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                ),
-                modifier = if (canAddCurrentUrl) Modifier.bouncyClickable(onClick = actions.onAddCurrentPage) else Modifier
+                )
             ) {
                 Icon(Icons.Rounded.BookmarkAdd, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))

@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -53,8 +52,7 @@ data class StartPageScreenCallbacks(
     val onResumeClick: () -> Unit = {},
     val onPhotoOnlyToggle: () -> Unit = {},
     val onOpenSponsors: (String) -> Unit = {},
-    val onOpenAAAnything: () -> Unit = {},
-    val onDismissAAAnything: () -> Unit = {}
+    val onOpenAAAnything: () -> Unit = {}
 )
 
 @Composable
@@ -65,20 +63,16 @@ fun StartPageScreen(
     sponsorsQrBitmap: Bitmap?,
     customBackgroundBitmap: Bitmap? = null,
     isNavigating: Boolean = false,
+    showAAAnythingBanner: Boolean = false,
     callbacks: StartPageScreenCallbacks = StartPageScreenCallbacks(),
     modifier: Modifier = Modifier
 ) {
     var shouldHideSponsors by remember {
         mutableStateOf(BrowserPreferences.shouldHideSponsors(context))
     }
-    var showAAAnythingPromotion by remember {
-        mutableStateOf(BrowserPreferences.shouldShowAAAnythingPromotion(context))
-    }
     val prefsListener = remember(context) {
         SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == StartPagePreferences.KEY_SHOW_AA_ANYTHING_PROMOTION) {
-                showAAAnythingPromotion = BrowserPreferences.shouldShowAAAnythingPromotion(context)
-            } else if (key == UIPreferences.KEY_HIDE_SPONSORS) {
+            if (key == UIPreferences.KEY_HIDE_SPONSORS) {
                 shouldHideSponsors = BrowserPreferences.shouldHideSponsors(context)
             }
         }
@@ -107,14 +101,10 @@ fun StartPageScreen(
                         onNavigate = callbacks.onNavigate
                     )
 
-                    if (showAAAnythingPromotion) {
+                    if (showAAAnythingBanner) {
                         Spacer(Modifier.height(16.dp))
                         AAAnythingPromotionCard(
-                            onOpenUrl = callbacks.onOpenAAAnything,
-                            onDismiss = {
-                                showAAAnythingPromotion = false
-                                callbacks.onDismissAAAnything()
-                            }
+                            onOpenUrl = callbacks.onOpenAAAnything
                         )
                     }
 

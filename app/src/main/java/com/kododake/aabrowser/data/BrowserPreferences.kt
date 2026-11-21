@@ -18,9 +18,11 @@
 package com.kododake.aabrowser.data
 
 import android.content.Context
+import android.content.pm.PackageManager
 import com.kododake.aabrowser.data.prefs.BookmarkPreferences
 import com.kododake.aabrowser.data.prefs.DisplayPreferences
 import com.kododake.aabrowser.data.prefs.SitePermissionPreferences
+import com.kododake.aabrowser.data.prefs.StartPagePreferences
 import com.kododake.aabrowser.data.prefs.TabSessionPreferences
 import com.kododake.aabrowser.data.prefs.UIPreferences
 import com.kododake.aabrowser.data.prefs.UrlFormatter
@@ -113,8 +115,44 @@ object BrowserPreferences {
     fun getStartPageBackgroundUri(context: Context): String? = BookmarkPreferences.getStartPageBackgroundUri(context)
     fun setStartPageBackgroundUri(context: Context, uri: String?) = BookmarkPreferences.setStartPageBackgroundUri(context, uri)
     fun clearStartPageBackgroundUri(context: Context) = BookmarkPreferences.clearStartPageBackgroundUri(context)
+    private const val KEY_LAST_APP_VERSION_CODE = "last_app_version_code"
+    private const val KEY_KEEP_ANDROID_OPEN_ACKNOWLEDGED = "keep_android_open_acknowledged"
+
     fun shouldShowAAAnythingPromotion(context: Context): Boolean = BookmarkPreferences.shouldShowAAAnythingPromotion(context)
     fun setShowAAAnythingPromotion(context: Context, show: Boolean) = BookmarkPreferences.setShowAAAnythingPromotion(context, show)
+
+    fun isKeepAndroidOpenAcknowledged(context: Context): Boolean =
+        context.getSharedPreferences(StartPagePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_KEEP_ANDROID_OPEN_ACKNOWLEDGED, false)
+
+    fun setKeepAndroidOpenAcknowledged(context: Context, acknowledged: Boolean) {
+        context.getSharedPreferences(StartPagePreferences.PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_KEEP_ANDROID_OPEN_ACKNOWLEDGED, acknowledged)
+            .apply()
+    }
+
+    fun runUpgradeTasksIfNeeded(context: Context) {
+        val currentVersion = runCatching {
+            context.packageManager.getPackageInfo(
+                context.packageName,
+                PackageManager.PackageInfoFlags.of(0L)
+            ).longVersionCode
+        }.getOrNull() ?: return
+
+        val prefs = context.getSharedPreferences(StartPagePreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        val lastVersion = prefs.getLong(KEY_LAST_APP_VERSION_CODE, -1L)
+        if (!shouldResetOnUpgrade(lastVersion, currentVersion)) return
+
+        StartPagePreferences.setShowAAAnythingPromotion(context, true)
+        prefs.edit()
+            .putBoolean(KEY_KEEP_ANDROID_OPEN_ACKNOWLEDGED, false)
+            .putLong(KEY_LAST_APP_VERSION_CODE, currentVersion)
+            .apply()
+    }
+
+    internal fun shouldResetOnUpgrade(lastVersion: Long, currentVersion: Long): Boolean {
+        return currentVersion >= 0L && lastVersion != currentVersion
+    }
     fun ensureGameBookmarkMigrated(context: Context) = BookmarkPreferences.ensureGameBookmarkMigrated(context)
 
     // --- Site Permissions & Host Exceptions ---

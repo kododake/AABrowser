@@ -18,7 +18,6 @@
 package com.kododake.aabrowser.ui.compose.screens.menu
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -43,7 +42,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -84,16 +82,11 @@ fun MenuSwitchCard(
     val cardShape = RoundedCornerShape(20.dp)
 
     Surface(
+        onClick = { onCheckedChange(!isChecked) },
         shape = cardShape,
         color = cardBg,
         shadowElevation = 0.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-        ),
-        modifier = modifier
-            .fillMaxWidth()
-            .bouncyClickable(shape = cardShape) { onCheckedChange(!isChecked) }
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier

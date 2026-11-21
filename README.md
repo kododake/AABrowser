@@ -114,8 +114,8 @@ Every contribution makes AA Browser better!
       <sub>Microphone Support</sub>
     </td>
     <td align="center" valign="top" width="20%">
-      <a href="https://github.com/SaveEditors">
-        <img src="https://github.com/SaveEditors.png?s=100" width="60" alt="SaveEditors"/><br />
+      <a href="https://github.com/xecli">
+        <img src="https://github.com/xecli.png?s=100" width="60" alt="SaveEditors"/><br />
         <sub><b>SaveEditors</b></sub>
       </a><br />
       <sub>Multi-tab support, Original Home screen</sub>
@@ -160,19 +160,16 @@ I care about the app's growth, but I care about your privacy even more. This app
 
 
 Love **AA Browser**, but wish you could also run your other favorite apps on your car's screen? Check out **[AA Anything](https://github.com/kododake/AAAnything)** — a brand-new tool I built to unlock your dashboard for everyday Android apps!
+### **Transform your car into an advanced entertainment space using VLC for free!** 🎬🍿  
 
-- 🎬 **Bring Your Apps to the Dash:** Project media players (like **VLC** — completely free to use!), plus unlock third-party web browsers, finance trackers, and handy utilities directly on Android Auto *(excluding apps with strict DRM or Play Integrity restrictions)*.
+- 🎬 **Bring Your Apps to the Dash:** Project media players (like **VLC** — completely **free to use!**), plus unlock **third-party web browsers**, finance trackers, and handy utilities directly on Android Auto *(excluding apps with strict DRM or Play Integrity restrictions)*.
 - 📱 **No Root, No PC Required:** Forget complicated ADB commands. Everything happens right on your phone in just a few taps—pick an app, tap **Patch & Install**, and plug in!
 - 🔄 **Effortless In-Place Updates:** Keep all your app data and login sessions intact when updating apps or after Android system updates.
 - 🛡️ **100% Safe for Your Vehicle:** Operates purely over standard Android Auto projection on **Android 15+** with zero modifications to your car's head unit.
 
 <div align="center">
-  <a href="https://github.com/kododake/AAAnything">
-    <img src="https://img.shields.io/badge/Explore-AA_Anything-blue?style=for-the-badge&logo=github&logoColor=white" height="40" alt="Explore AA Anything">
-  </a>
-  &nbsp;
   <a href="https://github.com/kododake/AAAnything/releases/latest">
-    <img src="https://img.shields.io/badge/Get_It_On-GitHub_Releases-181717?style=for-the-badge&logo=github&logoColor=white" height="40" alt="Get AA Anything on GitHub Releases">
+    <img src="https://img.shields.io/badge/Download_APK-GitHub_Releases-181717?style=for-the-badge&logo=github&logoColor=white" height="40" alt="Get AA Anything on GitHub Releases">
   </a>
 </div>
 

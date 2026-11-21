@@ -20,18 +20,19 @@ package com.kododake.aabrowser.ui.compose.screens.settings.sections
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -47,7 +48,8 @@ import com.kododake.aabrowser.AppConstants
 import com.kododake.aabrowser.R
 import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.ui.compose.components.ExpressiveListItem
-import com.kododake.aabrowser.ui.compose.components.ListGroupPosition
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 
 @Composable
 fun StartPageSettingsComposable(
@@ -71,73 +73,72 @@ fun StartPageSettingsComposable(
         )
 
         val hasCustomBg = !bgUri.isNullOrBlank()
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_start_page_choose_background),
-            supportingText = if (hasCustomBg) {
-                stringResource(R.string.settings_start_page_background_custom)
-            } else {
-                stringResource(R.string.settings_start_page_background_default)
-            },
-            leadingIcon = Icons.Rounded.Image,
-            position = ListGroupPosition.Top,
-            trailingContent = if (hasCustomBg && onClearStartPageBackground != null) {
-                {
-                    IconButton(onClick = {
-                        onClearStartPageBackground()
-                        bgUri = null
-                    }) {
-                        Icon(
-                            Icons.Rounded.Delete,
-                            contentDescription = stringResource(R.string.settings_start_page_clear_background)
-                        )
+        Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_start_page_choose_background),
+                supportingText = if (hasCustomBg) {
+                    stringResource(R.string.settings_start_page_background_custom)
+                } else {
+                    stringResource(R.string.settings_start_page_background_default)
+                },
+                leadingIcon = Icons.Rounded.Image,
+                index = 0,
+                count = 3,
+                trailingContent = if (hasCustomBg && onClearStartPageBackground != null) {
+                    {
+                        IconButton(onClick = {
+                            onClearStartPageBackground()
+                            bgUri = null
+                        }) {
+                            Icon(
+                                Icons.Rounded.Delete,
+                                contentDescription = stringResource(R.string.settings_start_page_clear_background)
+                            )
+                        }
+                    }
+                } else null,
+                onClick = { onPickStartPageBackground?.invoke() }
+            )
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_start_page_show_aa_anything),
+                supportingText = stringResource(R.string.settings_start_page_show_aa_anything_desc),
+                leadingIcon = Icons.Rounded.DirectionsCar,
+                index = 1,
+                count = 3,
+                trailingContent = {
+                    Switch(
+                        checked = showAAAnythingBanner,
+                        onCheckedChange = { checked ->
+                            showAAAnythingBanner = checked
+                            BrowserPreferences.setShowAAAnythingPromotion(context, checked)
+                            onAAAnythingBannerVisibilityChanged?.invoke()
+                        }
+                    )
+                },
+                onClick = {
+                    val next = !showAAAnythingBanner
+                    showAAAnythingBanner = next
+                    BrowserPreferences.setShowAAAnythingPromotion(context, next)
+                    onAAAnythingBannerVisibilityChanged?.invoke()
+                }
+            )
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_start_page_about_aa_anything),
+                supportingText = stringResource(R.string.settings_start_page_about_aa_anything_desc),
+                leadingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
+                index = 2,
+                count = 3,
+                onClick = {
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppConstants.AA_ANYTHING_LATEST_RELEASE_URL))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
                     }
                 }
-            } else null,
-            onClick = { onPickStartPageBackground?.invoke() }
-        )
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_start_page_show_aa_anything),
-            supportingText = stringResource(R.string.settings_start_page_show_aa_anything_desc),
-            leadingIcon = Icons.Rounded.DirectionsCar,
-            position = ListGroupPosition.Middle,
-            trailingContent = {
-                Switch(
-                    checked = showAAAnythingBanner,
-                    onCheckedChange = { checked ->
-                        showAAAnythingBanner = checked
-                        BrowserPreferences.setShowAAAnythingPromotion(context, checked)
-                        onAAAnythingBannerVisibilityChanged?.invoke()
-                    }
-                )
-            },
-            onClick = {
-                val next = !showAAAnythingBanner
-                showAAAnythingBanner = next
-                BrowserPreferences.setShowAAAnythingPromotion(context, next)
-                onAAAnythingBannerVisibilityChanged?.invoke()
-            }
-        )
-
-        Spacer(Modifier.height(3.dp))
-
-        ExpressiveListItem(
-            headline = stringResource(R.string.settings_start_page_about_aa_anything),
-            supportingText = stringResource(R.string.settings_start_page_about_aa_anything_desc),
-            leadingIcon = Icons.AutoMirrored.Rounded.OpenInNew,
-            position = ListGroupPosition.Bottom,
-            onClick = {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppConstants.AA_ANYTHING_LATEST_RELEASE_URL))
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                } catch (_: Exception) {
-                }
-            }
-        )
-
-        Spacer(Modifier.height(3.dp))
+            )
+        }
     }
 }

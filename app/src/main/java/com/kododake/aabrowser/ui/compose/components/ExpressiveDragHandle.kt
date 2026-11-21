@@ -17,38 +17,29 @@
 
 package com.kododake.aabrowser.ui.compose.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 
-/**
- * Unified M3 Expressive Drag Handle component across all bottom sheets and dialog screens.
- * Features a 64dp x 6dp pill with 48dp minimum accessible touch height.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpressiveDragHandle(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(36.dp),
+        modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(width = 64.dp, height = 6.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        BottomSheetDefaults.DragHandle(
+            width = 64.dp,
+            height = 6.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
         )
     }
 }

@@ -24,14 +24,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,7 +38,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalToggleButton
+import androidx.compose.material3.FilledTonalToggleButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,32 +54,34 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.theme.ExpressiveTypography
 
 enum class SponsorTab {
     BUY_ME_A_COFFEE,
-    GITHUB_SPONSORS
+    GITHUB_SPONSORS;
+
+    fun next(): SponsorTab = when (this) {
+        BUY_ME_A_COFFEE -> GITHUB_SPONSORS
+        GITHUB_SPONSORS -> BUY_ME_A_COFFEE
+    }
 }
 
 @Composable
 fun StartPageSponsorsSection(
     githubQrBitmap: Bitmap?,
     onOpenUrl: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    initialTab: SponsorTab = SponsorTab.BUY_ME_A_COFFEE
+    modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isDark = isSystemInDarkTheme()
-    var selectedTab by remember { mutableStateOf(initialTab) }
+    var selectedTab by remember { mutableStateOf(SponsorTab.BUY_ME_A_COFFEE) }
 
     val containerColor = if (isDark) {
         MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f)
@@ -87,10 +93,6 @@ fun StartPageSponsorsSection(
         shape = RoundedCornerShape(24.dp),
         color = containerColor,
         shadowElevation = 0.dp,
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-        ),
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -141,6 +143,7 @@ fun StartPageSponsorsSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SponsorTabSelector(
     selectedTab: SponsorTab,
@@ -149,105 +152,74 @@ private fun SponsorTabSelector(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    Row(
-        modifier = modifier
-            .then(if (isLandscape) Modifier.widthIn(max = 480.dp).fillMaxWidth() else Modifier.fillMaxWidth())
-            .padding(top = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        val isBmc = selectedTab == SponsorTab.BUY_ME_A_COFFEE
-        val isGithub = selectedTab == SponsorTab.GITHUB_SPONSORS
+    val tabs = listOf(
+        Triple(SponsorTab.BUY_ME_A_COFFEE, stringResource(R.string.start_page_bmc_tab), R.drawable.ic_bmc_logo),
+        Triple(SponsorTab.GITHUB_SPONSORS, stringResource(R.string.start_page_github_tab), R.drawable.ic_github)
+    )
 
-        val bmcShape = RoundedCornerShape(
-            topStart = 22.dp,
-            bottomStart = 22.dp,
-            topEnd = 8.dp,
-            bottomEnd = 8.dp
-        )
-        val githubShape = RoundedCornerShape(
-            topStart = 8.dp,
-            bottomStart = 8.dp,
-            topEnd = 22.dp,
-            bottomEnd = 22.dp
-        )
-
-        SponsorTabButton(
-            title = stringResource(R.string.start_page_bmc_tab),
-            iconRes = R.drawable.ic_bmc_logo,
-            isSelected = isBmc,
-            isDark = isDark,
-            shape = bmcShape,
-            onClick = { onTabSelected(SponsorTab.BUY_ME_A_COFFEE) },
-            modifier = Modifier.weight(1f)
-        )
-
-        SponsorTabButton(
-            title = stringResource(R.string.start_page_github_tab),
-            iconRes = R.drawable.ic_github,
-            isSelected = isGithub,
-            isDark = isDark,
-            shape = githubShape,
-            onClick = { onTabSelected(SponsorTab.GITHUB_SPONSORS) },
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun SponsorTabButton(
-    title: String,
-    iconRes: Int,
-    isSelected: Boolean,
-    isDark: Boolean,
-    shape: Shape,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
-    } else if (isDark) {
+    val unselectedContainerColor = if (isDark) {
         MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.45f)
     } else {
         MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.55f)
     }
 
-    val contentColor = if (isSelected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    val borderColor = if (isSelected) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-    }
-
-    Surface(
+    ButtonGroup(
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         modifier = modifier
-            .height(44.dp)
-            .bouncyClickable(shape = shape, onClick = onClick),
-        shape = shape,
-        color = containerColor,
-        contentColor = contentColor,
-        border = BorderStroke(width = 1.dp, color = borderColor),
-        shadowElevation = 0.dp
+            .then(if (isLandscape) Modifier.widthIn(max = 480.dp).fillMaxWidth() else Modifier.fillMaxWidth())
+            .padding(top = 12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Image(
-                painter = painterResource(iconRes),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = title,
-                style = ExpressiveTypography.labelLargeEmphasized,
-                maxLines = 1
+        tabs.forEachIndexed { index, (tab, title, iconRes) ->
+            customItem(
+                buttonGroupContent = {
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isSelected = selectedTab == tab
+                    val shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    }
+                    FilledTonalToggleButton(
+                        checked = isSelected,
+                        onCheckedChange = { onTabSelected(tab) },
+                        shapes = shapes,
+                        interactionSource = interactionSource,
+                        colors = FilledTonalToggleButtonDefaults.colors(
+                            containerColor = unselectedContainerColor,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .animateWidth(interactionSource)
+                    ) {
+                        Image(
+                            painter = painterResource(iconRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = title,
+                            style = ExpressiveTypography.labelLargeEmphasized,
+                            maxLines = 1
+                        )
+                    }
+                },
+                menuContent = { state ->
+                    DropdownMenuItem(
+                        text = { Text(title) },
+                        onClick = {
+                            state.dismiss()
+                            onTabSelected(tab)
+                        }
+                    )
+                }
             )
         }
     }

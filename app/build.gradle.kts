@@ -13,13 +13,14 @@ plugins {
 android {
     namespace = "com.kododake.aabrowser"
     compileSdk = 37
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId = "com.kododake.aabrowser"
         minSdk = 35
         targetSdk = 37
-        versionCode = 10
-        versionName = "3.3"
+        versionCode = 11
+        versionName = "3.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

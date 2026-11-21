@@ -52,7 +52,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.theme.ExpressiveTypography
 
 @Composable
@@ -134,8 +133,7 @@ fun QrCodeDialog(
         confirmButton = {
             Button(
                 onClick = onShare,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.bouncyClickable(onClick = onShare)
+                shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
@@ -144,8 +142,7 @@ fun QrCodeDialog(
         },
         dismissButton = {
             TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.bouncyClickable(onClick = onDismiss)
+                onClick = onDismiss
             ) {
                 Text(stringResource(android.R.string.cancel))
             }

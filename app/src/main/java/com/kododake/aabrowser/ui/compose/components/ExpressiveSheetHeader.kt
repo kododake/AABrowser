@@ -17,7 +17,6 @@
 
 package com.kododake.aabrowser.ui.compose.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -68,7 +67,6 @@ fun ExpressiveSheetHeader(
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = cardColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
         shadowElevation = 0.dp,
         modifier = modifier
             .fillMaxWidth()
@@ -86,8 +84,7 @@ fun ExpressiveSheetHeader(
                 modifier = Modifier.weight(1f, fill = false)
             ) {
                 IconButton(
-                    onClick = onBack,
-                    modifier = Modifier.bouncyClickable(onClick = onBack)
+                    onClick = onBack
                 ) {
                     Icon(
                         Icons.AutoMirrored.Rounded.ArrowBack,

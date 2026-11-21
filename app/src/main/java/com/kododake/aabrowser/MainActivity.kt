@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity(), MainActivityCallbackFactory.CallbackHo
         DynamicColors.applyToActivityIfAvailable(this)
         AppCompatDelegate.setDefaultNightMode(BrowserPreferences.getThemeMode(this).nightMode)
         BrowserPreferences.ensureGameBookmarkMigrated(this)
+        BrowserPreferences.runUpgradeTasksIfNeeded(this)
         super.onCreate(savedInstanceState)
 
         shouldForceSessionRestore = (savedInstanceState != null)

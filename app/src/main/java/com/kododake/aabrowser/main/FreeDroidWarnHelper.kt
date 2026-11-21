@@ -18,13 +18,12 @@
 package com.kododake.aabrowser.main
 
 import android.app.Activity
-import android.content.Context
 import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.kododake.aabrowser.AppConstants.FREE_DROID_WARN_SOLUTIONS_URL
-import com.kododake.aabrowser.AppConstants.FREE_DROID_WARN_VERSION_KEY
 import com.kododake.aabrowser.AppConstants.KEEP_ANDROID_OPEN_URL
+import com.kododake.aabrowser.data.BrowserPreferences
 import com.kododake.aabrowser.ui.compose.screens.dialogs.DialogViews
 import org.woheller69.freeDroidWarn.R as FreeDroidWarnR
 
@@ -35,11 +34,7 @@ object FreeDroidWarnHelper {
         errorColor: Int,
         onNavigate: (String) -> Unit
     ) {
-        val vCode = runCatching {
-            activity.packageManager.getPackageInfo(activity.packageName, 0).longVersionCode.toInt()
-        }.getOrDefault(1)
-        val pref = activity.getSharedPreferences("${activity.packageName}_preferences", Context.MODE_PRIVATE)
-        if (vCode <= pref.getInt(FREE_DROID_WARN_VERSION_KEY, 0)) return
+        if (BrowserPreferences.isKeepAndroidOpenAcknowledged(activity)) return
 
         var dialog: AlertDialog? = null
         val view = DialogViews.createConfirmationDialogView(
@@ -50,7 +45,7 @@ object FreeDroidWarnHelper {
             confirmButtonText = activity.getString(android.R.string.ok),
             onConfirm = {
                 try { dialog?.dismiss() } catch (_: Exception) {}
-                pref.edit().putInt(FREE_DROID_WARN_VERSION_KEY, vCode).apply()
+                BrowserPreferences.setKeepAndroidOpenAcknowledged(activity, true)
             },
             secondaryButtonText = activity.getString(FreeDroidWarnR.string.solution),
             onSecondary = {

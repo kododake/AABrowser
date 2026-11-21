@@ -17,7 +17,6 @@
 
 package com.kododake.aabrowser.ui.compose.screens.share
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,7 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @Composable
 fun QrUrlCard(
@@ -63,13 +61,11 @@ fun QrUrlCard(
 
     Column(modifier = modifier.fillMaxWidth()) {
         Surface(
+            onClick = onCopyUrl,
             shape = RoundedCornerShape(16.dp),
             color = urlCardColor,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
             shadowElevation = 0.dp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .bouncyClickable(onClick = onCopyUrl)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
@@ -107,7 +103,6 @@ fun QrUrlCard(
                 modifier = Modifier
                     .weight(1f)
                     .height(50.dp)
-                    .bouncyClickable(onClick = onCopyUrl)
             ) {
                 Icon(
                     Icons.Rounded.ContentCopy,
@@ -128,7 +123,6 @@ fun QrUrlCard(
                 modifier = Modifier
                     .weight(1f)
                     .height(50.dp)
-                    .bouncyClickable(onClick = onShareExternal)
             ) {
                 Icon(
                     Icons.AutoMirrored.Rounded.OpenInNew,

@@ -17,7 +17,6 @@
 
 package com.kododake.aabrowser.ui.compose.screens.menu
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
@@ -47,7 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 
 @Composable
 fun MenuFooter(
@@ -93,11 +91,6 @@ fun MenuFooter(
                 modifier = Modifier
                     .height(42.dp)
                     .padding(horizontal = 4.dp)
-                    .bouncyClickable(
-                        interactionSource = checkUpdateInteraction,
-                        shape = RoundedCornerShape(21.dp),
-                        onClick = onCheckUpdate
-                    )
             ) {
                 Text(
                     text = stringResource(R.string.menu_check_latest),
@@ -120,14 +113,7 @@ fun MenuFooter(
                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                     containerColor = githubBg
                 ),
-                modifier = Modifier
-                    .size(40.dp)
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
-                        shape = CircleShape
-                    )
-                    .bouncyClickable(onClick = onGitHub)
+                modifier = Modifier.size(40.dp)
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_github),

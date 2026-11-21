@@ -32,6 +32,7 @@ import com.kododake.aabrowser.ui.QRUtils
 import com.kododake.aabrowser.ui.compose.screens.startpage.StartPageScreenCallbacks
 import com.kododake.aabrowser.ui.compose.screens.startpage.StartPageSlotUi
 import com.kododake.aabrowser.ui.compose.screens.startpage.StartPageViews
+import com.kododake.aabrowser.util.PackageInstallChecker
 
 class StartPageManager(
     private val activity: AppCompatActivity,
@@ -57,6 +58,8 @@ class StartPageManager(
 
     var isShowingStartPage: Boolean = false
     var isStartPagePhotoOnlyMode: Boolean = false
+
+    private val showAAAnythingBannerState = mutableStateOf(false)
 
     private val backgroundRenderer = StartPageBackgroundRenderer(
         activity = activity,
@@ -145,13 +148,14 @@ class StartPageManager(
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppConstants.AA_ANYTHING_LATEST_RELEASE_URL))
                         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         activity.startActivity(intent)
+                        Toast.makeText(
+                            activity,
+                            R.string.aa_anything_promo_opened_toast,
+                            Toast.LENGTH_SHORT
+                        ).show()
                     } catch (_: Exception) {
                         Toast.makeText(activity, R.string.error_generic_message, Toast.LENGTH_SHORT).show()
                     }
-                },
-                onDismissAAAnything = {
-                    BrowserPreferences.setShowAAAnythingPromotion(activity, false)
-                    refreshStartPage()
                 }
             )
 
@@ -163,6 +167,7 @@ class StartPageManager(
                 customBackgroundBitmapState = backgroundRenderer.customBackgroundBitmapState,
                 customBackgroundBitmapProvider = { backgroundRenderer.customBackgroundBitmap },
                 isNavigatingState = isNavigatingState,
+                showAAAnythingBannerState = showAAAnythingBannerState,
                 callbacks = screenCallbacks
             )
             composeStartPageView = view
@@ -201,6 +206,7 @@ class StartPageManager(
         }
 
         navigationLoader.cancelLoading()
+        updateAAAnythingBannerState()
         isShowingStartPage = true
         isStartPagePhotoOnlyMode = false
         binding.startPageRoot.visibility = View.VISIBLE
@@ -236,8 +242,14 @@ class StartPageManager(
         }
     }
 
+    private fun updateAAAnythingBannerState() {
+        showAAAnythingBannerState.value = BrowserPreferences.shouldShowAAAnythingPromotion(activity) &&
+            !PackageInstallChecker.isPackageInstalled(activity, AppConstants.AA_ANYTHING_PACKAGE_NAME)
+    }
+
     fun refreshStartPage() {
         if (isNavigating) return
+        updateAAAnythingBannerState()
         backgroundRenderer.refreshStartPageBackground()
         composeStartPageView?.let { binding.startPageRoot.removeView(it) }
         composeStartPageView = null

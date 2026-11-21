@@ -56,7 +56,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.kododake.aabrowser.R
-import com.kododake.aabrowser.ui.compose.components.bouncyClickable
 import com.kododake.aabrowser.ui.compose.theme.ExpressiveTypography
 
 @Composable
@@ -196,7 +195,7 @@ private fun DialogActionButton(
             border = border,
             colors = ButtonDefaults.outlinedButtonColors(containerColor = containerColor, contentColor = contentColor),
             contentPadding = contentPadding,
-            modifier = modifier.bouncyClickable(onClick = onClick)
+            modifier = modifier
         ) { textContent() }
     } else {
         Button(
@@ -204,7 +203,7 @@ private fun DialogActionButton(
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = containerColor, contentColor = contentColor),
             contentPadding = contentPadding,
-            modifier = modifier.bouncyClickable(onClick = onClick)
+            modifier = modifier
         ) { textContent() }
     }
 }

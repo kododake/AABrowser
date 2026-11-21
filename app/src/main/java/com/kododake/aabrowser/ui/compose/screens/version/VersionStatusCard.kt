@@ -17,7 +17,6 @@
 
 package com.kododake.aabrowser.ui.compose.screens.version
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -60,7 +59,6 @@ fun VersionStatusCard(
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = cardColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)),
         shadowElevation = 0.dp,
         modifier = modifier.fillMaxWidth()
     ) {
