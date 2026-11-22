@@ -46,6 +46,10 @@ class BrowserWebViewClient(
         return handleUri(uri)
     }
 
+    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+        return CrossOriginIsolation.intercept(request) ?: super.shouldInterceptRequest(view, request)
+    }
+
     private fun handleUri(uri: Uri?): Boolean {
         if (uri == null) return false
         val scheme = uri.scheme?.lowercase()
@@ -74,6 +78,7 @@ class BrowserWebViewClient(
     override fun onPageFinished(view: WebView, url: String?) {
         super.onPageFinished(view, url)
         view.evaluateJavascript(SpeechRecognitionBridge.POLYFILL_JS, null)
+        CrossOriginIsolation.checkPage(view, url)
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
             if (BrowserPreferences.isDrmL3EnforcerEnabled(view.context)) {
                 view.evaluateJavascript(WebScripts.DRM_L3_ENFORCER_JS, null)

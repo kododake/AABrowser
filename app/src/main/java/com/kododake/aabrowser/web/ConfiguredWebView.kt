@@ -64,6 +64,8 @@ fun configureWebView(
         isVerticalScrollBarEnabled = true
 
         WebView.setWebContentsDebuggingEnabled(false)
+        CrossOriginIsolation.applyAllowlist(this)
+        CrossOriginIsolation.installNoFullscreenScript(this)
 
         val originalUserAgent = settings.userAgentString
         setTag(R.id.webview_original_user_agent_tag, originalUserAgent)

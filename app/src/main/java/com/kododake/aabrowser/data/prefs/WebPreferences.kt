@@ -23,6 +23,7 @@ object WebPreferences {
     const val PREFS_NAME = "browser_prefs"
     private const val KEY_DRM_L3_ENFORCER = "drm_l3_enforcer_enabled"
     const val DEFAULT_DRM_L3_ENFORCER = true
+    private const val KEY_CROSS_ORIGIN_ISOLATION = "cross_origin_isolation_enabled"
 
     fun isDrmL3EnforcerEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -33,6 +34,17 @@ object WebPreferences {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(KEY_DRM_L3_ENFORCER, enabled)
+            .apply()
+    }
+
+    fun isCrossOriginIsolationEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_CROSS_ORIGIN_ISOLATION, false)
+
+    fun setCrossOriginIsolationEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_CROSS_ORIGIN_ISOLATION, enabled)
             .apply()
     }
 }

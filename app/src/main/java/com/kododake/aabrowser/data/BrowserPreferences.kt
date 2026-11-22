@@ -168,4 +168,6 @@ object BrowserPreferences {
     // --- Web Engine & DRM ---
     fun isDrmL3EnforcerEnabled(context: Context): Boolean = WebPreferences.isDrmL3EnforcerEnabled(context)
     fun setDrmL3EnforcerEnabled(context: Context, enabled: Boolean) = WebPreferences.setDrmL3EnforcerEnabled(context, enabled)
+    fun isCrossOriginIsolationEnabled(context: Context): Boolean = WebPreferences.isCrossOriginIsolationEnabled(context)
+    fun setCrossOriginIsolationEnabled(context: Context, enabled: Boolean) = WebPreferences.setCrossOriginIsolationEnabled(context, enabled)
 }
