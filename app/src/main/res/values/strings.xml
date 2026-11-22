@@ -130,6 +130,9 @@
     <string name="settings_site_data_title">Privacy and site data</string>
     <string name="settings_site_data_description">Manage saved site permissions, cookies, and local site data stored by the browser.</string>
     <string name="settings_drm_l3_enforcer">DRM Widevine L3 enforcer</string>
+    <string name="settings_cross_origin_isolation">Cross-origin isolation for games</string>
+    <string name="settings_cross_origin_isolation_description">Lets sites that request it (COOP/COEP) use SharedArrayBuffer and WASM threads, needed by some browser games. WebView keeps all sites in one process, so enable it only if you need it.
+Disabled by default.</string>
     <string name="settings_drm_l3_enforcer_description">Enforces Widevine L3 compatibility to resolve black screen or playback failures on unsupported hardware.\nEnabled by default.</string>
     <string name="settings_clear_site_permissions">Reset saved site permissions</string>
     <string name="settings_clear_cookies">Delete cookies and site data</string>

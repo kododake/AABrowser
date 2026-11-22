@@ -202,6 +202,7 @@ fun SettingsScreen(
                     PrivacyAndAboutComposable(
                         context = context,
                         onDrmL3EnforcerChanged = callbacks.onDrmL3EnforcerChanged,
+                        onCrossOriginIsolationChanged = callbacks.onCrossOriginIsolationChanged,
                         onUserAgentChanged = callbacks.onUserAgentChanged,
                         onEasterEggHoldStart = {
                             isEasterEggHolding = true

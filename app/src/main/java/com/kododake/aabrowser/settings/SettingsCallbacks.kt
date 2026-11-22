@@ -29,6 +29,7 @@ data class SettingsCallbacks(
     val onSponsorsVisibilityChanged: () -> Unit = {},
     val onAAAnythingBannerVisibilityChanged: () -> Unit = {},
     val onDrmL3EnforcerChanged: () -> Unit = {},
+    val onCrossOriginIsolationChanged: () -> Unit = {},
     val onUserAgentChanged: () -> Unit = {}
 )
 

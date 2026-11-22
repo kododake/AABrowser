@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LockReset
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +64,7 @@ import com.kododake.aabrowser.ui.compose.components.easterEggReleaseDetector
 import com.kododake.aabrowser.ui.compose.screens.dialogs.CustomUserAgentDialog
 import com.kododake.aabrowser.ui.compose.screens.dialogs.ExpressiveConfirmationDialog
 import com.kododake.aabrowser.ui.compose.screens.dialogs.ExpressiveSingleChoiceDialog
+import com.kododake.aabrowser.web.CrossOriginIsolation
 import com.kododake.aabrowser.web.SslErrorHandlerHelper
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -70,6 +72,7 @@ import com.kododake.aabrowser.web.SslErrorHandlerHelper
 fun PrivacyAndAboutComposable(
     context: Context,
     onDrmL3EnforcerChanged: () -> Unit = {},
+    onCrossOriginIsolationChanged: () -> Unit = {},
     onUserAgentChanged: () -> Unit = {},
     onEasterEggHoldStart: () -> Unit = {},
     onEasterEggHoldEnd: () -> Unit = {},
@@ -78,6 +81,7 @@ fun PrivacyAndAboutComposable(
     var userAgent by remember { mutableStateOf(BrowserPreferences.getUserAgentProfile(context)) }
     var customUserAgent by remember { mutableStateOf(BrowserPreferences.getCustomUserAgent(context)) }
     var drmL3Enabled by remember { mutableStateOf(BrowserPreferences.isDrmL3EnforcerEnabled(context)) }
+    var coiEnabled by remember { mutableStateOf(BrowserPreferences.isCrossOriginIsolationEnabled(context)) }
     var showUaDialog by remember { mutableStateOf(false) }
     var showCustomUaDialog by remember { mutableStateOf(false) }
     var showClearCookiesDialog by remember { mutableStateOf(false) }
@@ -92,7 +96,7 @@ fun PrivacyAndAboutComposable(
         )
 
         val isCustomUa = userAgent == UserAgentProfile.CUSTOM
-        val siteDataCount = if (isCustomUa) 5 else 4
+        val siteDataCount = if (isCustomUa) 6 else 5
         var siteDataIndex = 0
 
         Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
@@ -137,6 +141,30 @@ fun PrivacyAndAboutComposable(
                     drmL3Enabled = next
                     BrowserPreferences.setDrmL3EnforcerEnabled(context, next)
                     onDrmL3EnforcerChanged()
+                }
+            )
+
+            ExpressiveListItem(
+                headline = stringResource(R.string.settings_cross_origin_isolation),
+                supportingText = stringResource(R.string.settings_cross_origin_isolation_description),
+                leadingIcon = Icons.Rounded.SportsEsports,
+                index = siteDataIndex++,
+                count = siteDataCount,
+                trailingContent = {
+                    Switch(
+                        checked = coiEnabled,
+                        onCheckedChange = { checked ->
+                            coiEnabled = checked
+                            BrowserPreferences.setCrossOriginIsolationEnabled(context, checked)
+                            onCrossOriginIsolationChanged()
+                        }
+                    )
+                },
+                onClick = {
+                    val next = !coiEnabled
+                    coiEnabled = next
+                    BrowserPreferences.setCrossOriginIsolationEnabled(context, next)
+                    onCrossOriginIsolationChanged()
                 }
             )
 
@@ -278,6 +306,7 @@ fun PrivacyAndAboutComposable(
             onConfirm = {
                 WebStorage.getInstance().deleteAllData()
                 CookieManager.getInstance().removeAllCookies(null)
+                CrossOriginIsolation.clear(context)
                 Toast.makeText(context, R.string.settings_clear_cookies_success_title, Toast.LENGTH_SHORT).show()
                 showClearCookiesDialog = false
             },
